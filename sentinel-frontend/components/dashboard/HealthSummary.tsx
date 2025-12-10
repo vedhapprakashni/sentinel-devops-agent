@@ -42,7 +42,7 @@ export function HealthSummary({ uptime, servicesUp, totalServices, activeInciden
                 <div className="mt-4 w-full bg-white/10 rounded-full h-1">
                     <div
                         className="bg-blue-500 h-1 rounded-full transition-all duration-500"
-                        style={{ width: `${(servicesUp / totalServices) * 100}%` }}
+                        style={{ width: `${totalServices > 0 ? (servicesUp / totalServices) * 100 : 0}%` }}
                     />
                 </div>
             </Spotlight>
