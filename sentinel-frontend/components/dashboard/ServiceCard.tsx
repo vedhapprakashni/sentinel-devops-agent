@@ -5,6 +5,7 @@ import { MoreHorizontal, Cloud, Database, Server, Shield, Zap } from "lucide-rea
 import { Button } from "@/components/common/Button";
 import { cn } from "@/lib/utils";
 import { Spotlight } from "@/components/common/Spotlight";
+import { Sparkline } from "@/components/common/Sparkline";
 
 const ServiceIcon = ({ type }: { type: Service["type"] }) => {
     switch (type) {
@@ -67,15 +68,13 @@ export function ServiceCard({ service }: { service: Service }) {
                 </div>
             </div>
 
-            {/* Mini Sparkline (SVG) */}
-            <div className="h-12 w-full flex items-end gap-1 opacity-50 group-hover:opacity-100 transition-opacity">
-                {service.trend.map((value, i) => (
-                    <div
-                        key={i}
-                        className="flex-1 bg-primary/20 rounded-t-sm hover:bg-primary/60 transition-colors"
-                        style={{ height: `${value}%` }}
-                    />
-                ))}
+            {/* Mini Sparkline */}
+            <div className="h-10 w-full opacity-50 group-hover:opacity-100 transition-opacity mt-2">
+                <Sparkline
+                    data={service.trend.map(val => ({ value: val }))}
+                    color={service.status === "healthy" ? "#22d3ee" : (service.status === "degraded" ? "#fbbf24" : "#ef4444")}
+                    height={40}
+                />
             </div>
         </Spotlight>
     );
