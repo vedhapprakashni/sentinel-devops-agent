@@ -1,6 +1,9 @@
 networks:
   sentinel-net:
     driver: bridge
+    driver_opts:
+      com.docker.network.bridge.name: sentinel-net
+      com.docker.network.driver.mtu: 1500
 
 services:
   # Postgres for Kestra
@@ -19,7 +22,7 @@ services:
       - sentinel-net
     restart: always
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U kestra"]
+      test: [ "CMD-SHELL", "pg_isready -U kestra" ]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -103,6 +106,16 @@ services:
       - "11434:11434"
     volumes:
       - ollama-data:/root/.ollama
+    networks:
+      - sentinel-net
+    restart: always
+
+  # 5. The Backend API (Bridge)
+  backend:
+    build: ./backend
+    container_name: sentinel-backend
+    ports:
+      - "4000:4000"
     networks:
       - sentinel-net
     restart: always

@@ -54,6 +54,22 @@ tasks:
       🤖 SENTINEL AI REPORT:
       {{ outputs['ai-analysis'].body | jq(".choices[0].message.content") | first }}
 
+  # 4. Push Data to Backend Dashboard
+  - id: push-to-dashboard
+    type: io.kestra.plugin.core.http.Request
+    uri: http://backend:4000/api/kestra-webhook
+    method: POST
+    contentType: application/json
+    body: |
+      {
+        "aiReport": {{ outputs['ai-analysis'].body | jq(".choices[0].message.content") | first | json }},
+        "metrics": {
+          "auth": { "code": {{ outputs['get-auth'] is defined and outputs['get-auth'] is not null ? (outputs['get-auth'].code ?? 500) : 500 }} },
+          "payment": { "code": {{ outputs['get-payment'] is defined and outputs['get-payment'] is not null ? (outputs['get-payment'].code ?? 500) : 500 }} },
+          "notification": { "code": {{ outputs['get-notify'] is defined and outputs['get-notify'] is not null ? (outputs['get-notify'].code ?? 500) : 500 }} }
+        }
+      }
+
 triggers:
   - id: monitor-schedule
     type: io.kestra.plugin.core.trigger.Schedule
