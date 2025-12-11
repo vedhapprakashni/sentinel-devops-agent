@@ -37,6 +37,7 @@ services:
       - ./kestra-flows:/app/flows
       - kestra-data:/app/storage
     environment:
+      SECRET_GROQ_API_KEY: ${SECRET_GROQ_API_KEY}
       KESTRA_CONFIGURATION: |
         datasources:
           postgres:
