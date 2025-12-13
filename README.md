@@ -2,8 +2,6 @@
 
 <div align="center">
 
-<img src="sentinel-frontend/public/favicon.png" alt="Sentinel Logo" width="120" height="120"/>
-
 ![Sentinel Banner](https://img.shields.io/badge/Status-Active-success?style=for-the-badge) 
 [![Kestra](https://img.shields.io/badge/Orchestration-Kestra-7C3AED?style=for-the-badge&logo=data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHBhdGggZD0iTTEyIDJMMiA3TDEyIDEyTDIyIDdMMTIgMloiIGZpbGw9IndoaXRlIi8+CjxwYXRoIGQ9Ik0yIDEyTDEyIDE3TDIyIDEyIiBzdHJva2U9IndoaXRlIiBzdHJva2Utd2lkdGg9IjIiLz4KPC9zdmc+)](https://kestra.io)
 ![Next.js](https://img.shields.io/badge/Dashboard-Next.js_14-black?style=for-the-badge&logo=next.js)
@@ -14,6 +12,10 @@
 ### *"The On-Call Engineer That Never Sleeps"*
 
 **Sentinel** is an AI-driven autonomous DevOps agent that predicts system failures, analyzes root causes using LLMs, and executes self-healing workflows—**without human intervention**.
+
+🌐 **[Live Demo on Vercel](https://sentinel-devops-agent.vercel.app)** | 📖 [Documentation](ARCHITECTURE.md)
+
+> **Note**: The live demo shows the frontend UI/UX. Backend integration requires local setup (see [Quick Start](#-quick-start)).
 
 [Features](#-key-features) • [Architecture](#-architecture) • [Quick Start](#-quick-start) • [CLI Usage](#-cli-usage) • [Demo](#-live-demo)
 
