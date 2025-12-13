@@ -1,12 +1,14 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
-import { useWebSocket } from "./useWebSocket";
+import { useEffect, useState, useRef } from "react";
 
 export type TimeSeriesPoint = {
     timestamp: string;
-    value: number;
-    [key: string]: any; // Allow dynamic keys for multi-line charts
+    responseTime: number;
+    errorRate: number;
+    cpu: number;
+    value?: number; // derived or legacy
+    [key: string]: any;
 };
 
 export type ServiceMetrics = {
@@ -15,76 +17,112 @@ export type ServiceMetrics = {
     currentResponseTime: number;
     currentErrorRate: number;
     currentCpu: number;
-    history: TimeSeriesPoint[]; // Last 30 points for performance in demo
+    history: TimeSeriesPoint[];
 };
 
-/**
- * useMetrics Hook
- * 
- * Manages the state of metrics for the dashboard.
- * Consumes the WebSocket stream and appends new data points to the history.
- */
 export function useMetrics(timeRange: "1h" | "6h" | "24h" = "1h") {
+    // Helper for initial history
+    const initialHistory = Array(30).fill(0).map((_, i) => ({
+        timestamp: new Date(Date.now() - (30 - i) * 2000).toLocaleTimeString(),
+        responseTime: 20 + Math.random() * 10,
+        cpu: 10 + Math.random() * 10,
+        errorRate: 0
+    }));
+
     const [metrics, setMetrics] = useState<Record<string, ServiceMetrics>>({
-        "api-gateway": { id: "api-gateway", name: "API Gateway", currentResponseTime: 45, currentErrorRate: 0.1, currentCpu: 32, history: [] },
-        "auth-service": { id: "auth-service", name: "Auth Service", currentResponseTime: 85, currentErrorRate: 0.05, currentCpu: 22, history: [] },
-        "primary-db": { id: "primary-db", name: "Primary DB", currentResponseTime: 120, currentErrorRate: 0.01, currentCpu: 48, history: [] },
-        "payments-worker": { id: "payments-worker", name: "Payments Worker", currentResponseTime: 210, currentErrorRate: 0.2, currentCpu: 18, history: [] },
+        "auth-service": { id: "auth-service", name: "Auth Service", currentResponseTime: 45, currentErrorRate: 0, currentCpu: 32, history: initialHistory },
+        "payment-service": { id: "payment-service", name: "Payment Service", currentResponseTime: 85, currentErrorRate: 0, currentCpu: 22, history: initialHistory },
+        "notification-service": { id: "notification-service", name: "Notification Service", currentResponseTime: 120, currentErrorRate: 0, currentCpu: 48, history: initialHistory },
+        "api-gateway": { id: "api-gateway", name: "API Gateway", currentResponseTime: 15, currentErrorRate: 0, currentCpu: 12, history: initialHistory },
     });
 
-    const [connectionStatus, setConnectionStatus] = useState<string>("disconnected");
+    const [status, setStatus] = useState<string>("connecting");
+    const intervalRef = useRef<NodeJS.Timeout | null>(null);
 
-    // Handle incoming WebSocket messages
-    const handleMessage = useCallback((msg: any) => {
-        if (msg.type === "metrics_update") {
-            const payload = msg.payload;
+    const fetchMetrics = async () => {
+        try {
+            const res = await fetch("http://localhost:4000/api/status");
+            if (!res.ok) throw new Error("Failed to fetch");
+            const data = await res.json();
+
+            setStatus("connected");
             const timestamp = new Date().toLocaleTimeString();
 
-            setMetrics((prev) => {
+            setMetrics(prev => {
                 const next = { ...prev };
 
-                Object.keys(payload.services).forEach((serviceId) => {
-                    if (next[serviceId]) {
-                        const update = payload.services[serviceId];
+                // Map backend services to frontend
+                const serviceMap: any = {
+                    "auth-service": data.services?.auth,
+                    "payment-service": data.services?.payment,
+                    "notification-service": data.services?.notification
+                };
 
-                        // Update current values
-                        next[serviceId] = {
-                            ...next[serviceId],
-                            currentResponseTime: Math.round(update.responseTime),
-                            currentErrorRate: Number(update.errorRate.toFixed(2)),
-                            currentCpu: Math.round(update.cpu),
-                        };
+                Object.keys(next).forEach((key, index) => {
+                    const backendData = serviceMap[key];
+                    // Create base wave for visual liveliness (Sine wave + Noise)
+                    const time = Date.now() / 2000;
+                    const wave = Math.sin(time + index) * 10; // Phase shift by index
 
-                        // Append to history
-                        const newPoint: TimeSeriesPoint = {
-                            timestamp,
-                            value: next[serviceId].currentResponseTime, // Default to response time for simple history
-                            responseTime: next[serviceId].currentResponseTime,
-                            errorRate: next[serviceId].currentErrorRate,
-                            cpu: next[serviceId].currentCpu,
-                        };
+                    let responseTime = 0;
+                    let errorRate = 0;
+                    let cpu = 0;
 
-                        // Keep only last 30 points for performance in this demo
-                        const history = [...next[serviceId].history, newPoint];
-                        if (history.length > 30) history.shift();
-
-                        next[serviceId].history = history;
+                    // Base values per service type
+                    if (key === "api-gateway") {
+                        responseTime = 25 + wave;
+                        cpu = 15 + Math.random() * 5;
+                    } else if (key === "notification-service") {
+                        responseTime = 120 + wave + Math.random() * 10;
+                        cpu = 45 + Math.random() * 5;
+                    } else {
+                        responseTime = 45 + wave + Math.random() * 10; // Default
+                        cpu = 25 + Math.random() * 5;
                     }
-                });
 
+                    // If real backend data says it's down (code != 200)
+                    if (backendData && backendData.code !== 200) {
+                        errorRate = 1.0; // 100% error rate
+                        responseTime = 0;
+                        cpu = 0;
+                    } else if (backendData) {
+                        // Healthy: Add random jitter to the wave
+                        responseTime += Math.random() * 5;
+                    }
+
+                    // Round values for UI cleanliness
+                    responseTime = Math.round(responseTime);
+                    cpu = Math.round(cpu);
+
+                    // Update current values
+                    next[key] = {
+                        ...next[key],
+                        currentResponseTime: responseTime,
+                        currentErrorRate: errorRate,
+                        currentCpu: cpu,
+                        history: [
+                            ...next[key].history,
+                            { timestamp, responseTime, cpu, errorRate }
+                        ].slice(-30) // Keep last 30 points
+                    };
+                });
                 return next;
             });
-        }
-    }, []);
 
-    const { status } = useWebSocket("/api/stream", {
-        onMessage: handleMessage,
-        simulationInterval: 1000, // Update every second for smooth demo
-    });
+        } catch (error) {
+            console.error("Error fetching metrics:", error);
+            setStatus("error");
+        }
+    };
 
     useEffect(() => {
-        setConnectionStatus(status);
-    }, [status]);
+        fetchMetrics(); // Initial fetch
+        intervalRef.current = setInterval(fetchMetrics, 2000); // Poll every 2s to match Kestra's fast pace via flow
 
-    return { metrics, status: connectionStatus };
+        return () => {
+            if (intervalRef.current) clearInterval(intervalRef.current);
+        };
+    }, []);
+
+    return { metrics, status };
 }

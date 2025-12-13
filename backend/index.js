@@ -1,6 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 const bodyParser = require('body-parser');
+const axios = require('axios');
 
 const app = express();
 const PORT = 4000;
@@ -9,7 +10,7 @@ const PORT = 4000;
 app.use(cors());
 app.use(bodyParser.json());
 
-// --- IN-MEMORY DATABASE (Perfect for Hackathons) ---
+// --- IN-MEMORY DATABASE ---
 let systemStatus = {
   services: {
     auth: { status: 'unknown', code: 0, lastUpdated: null },
@@ -20,62 +21,170 @@ let systemStatus = {
   lastUpdated: new Date()
 };
 
-let activityLog = []; // Stores history of events
+let activityLog = [];
+let aiLogs = [];
+
+// Service configuration
+// Using localhost for local execution
+const services = [
+  { name: 'auth', url: 'http://localhost:3001/health' },
+  { name: 'payment', url: 'http://localhost:3002/health' },
+  { name: 'notification', url: 'http://localhost:3003/health' }
+];
+
+// Continuous health checking (every 5 seconds)
+async function checkServiceHealth() {
+  console.log('🔍 Checking service health...');
+
+  for (const service of services) {
+    try {
+      const response = await axios.get(service.url, { timeout: 3000 });
+      console.log(`✅ ${service.name}: ${response.status} - ${response.data.status}`);
+      systemStatus.services[service.name] = {
+        status: 'healthy',
+        code: response.status,
+        lastUpdated: new Date()
+      };
+    } catch (error) {
+      const code = error.response?.status || 503;
+      console.log(`❌ ${service.name}: ERROR - ${error.code || error.message}`);
+
+      systemStatus.services[service.name] = {
+        status: code >= 500 ? 'critical' : 'degraded',
+        code: code,
+        lastUpdated: new Date()
+      };
+
+      // Log the failure
+      if (code >= 500) {
+        const lastLog = activityLog[0];
+        const isDuplicate = lastLog && lastLog.message.includes(service.name.toUpperCase()) && lastLog.message.includes("DOWN");
+
+        if (!isDuplicate) {
+          activityLog.unshift({
+            id: Date.now(),
+            message: `${service.name.toUpperCase()} service is DOWN (HTTP ${code})`,
+            type: 'alert',
+            severity: 'critical',
+            timestamp: new Date()
+          });
+          if (activityLog.length > 50) activityLog.splice(50);
+        }
+      }
+    }
+  }
+  systemStatus.lastUpdated = new Date();
+}
+
+// Start continuous health monitoring
+setInterval(checkServiceHealth, 5000);
+checkServiceHealth(); // Initial check
 
 // --- ENDPOINTS FOR FRONTEND ---
 
-// 1. Get Overall System Status
 app.get('/api/status', (req, res) => {
   res.json(systemStatus);
 });
 
-// 2. Get Activity History
 app.get('/api/activity', (req, res) => {
-  res.json(activityLog.slice(0, 50)); // Return last 50 events
+  res.json({ activity: activityLog.slice(0, 50) });
+});
+
+app.get('/api/insights', (req, res) => {
+  res.json({ insights: aiLogs.slice(0, 20) });
 });
 
 // --- WEBHOOK FOR KESTRA ---
 
-// 3. Receive Data from Kestra AI
 app.post('/api/kestra-webhook', (req, res) => {
   const { aiReport, metrics } = req.body;
-
   console.log('📦 Received update from Kestra:', aiReport);
 
-  // Update System Status
-  systemStatus.aiAnalysis = aiReport;
+  if (aiReport) {
+    systemStatus.aiAnalysis = aiReport;
+  }
   systemStatus.lastUpdated = new Date();
 
+  // Parse Metrics Update
   if (metrics) {
-    systemStatus.services = metrics;
+    Object.keys(metrics).forEach(serviceName => {
+      if (systemStatus.services[serviceName]) {
+        systemStatus.services[serviceName].code = metrics[serviceName].code || 0;
+        const code = metrics[serviceName].code;
+        systemStatus.services[serviceName].status =
+          code >= 200 && code < 300 ? 'healthy' :
+            code >= 500 ? 'critical' : 'degraded';
+        systemStatus.services[serviceName].lastUpdated = new Date();
+      }
+    });
   }
 
-  // Add to Activity Log if it's NOT healthy or if it's a significant update
-  // We'll log everything for now to see activity in the demo
-  const isHealthy = aiReport && aiReport.includes("HEALTHY");
-  
-  if (!isHealthy) {
-      activityLog.unshift({
-        id: Date.now(),
-        message: aiReport,
-        type: 'alert',
-        timestamp: new Date()
-      });
-  } else {
-    // Optional: Log healthy checks too, but maybe less frequently or just one "All Clear"
-    // For demo visual density, might be nice to log healthy check-ins briefly or skip
-    // Let's keep it clean: only alerts in the activity log for now
-  }
+  aiLogs.unshift({
+    id: Date.now(),
+    analysis: aiReport,
+    metrics: metrics,
+    summary: aiReport,
+    timestamp: new Date()
+  });
+  if (aiLogs.length > 20) aiLogs.splice(20);
 
-  // Keep log size manageable
-  if (activityLog.length > 50) {
-      activityLog = activityLog.slice(0, 50);
+  if (aiReport && !aiReport.includes("HEALTHY")) {
+    activityLog.unshift({
+      id: Date.now(),
+      message: aiReport,
+      type: 'alert',
+      severity: aiReport.includes('CRITICAL') ? 'critical' : 'warning',
+      timestamp: new Date()
+    });
+    if (activityLog.length > 50) activityLog.splice(50);
   }
 
   res.json({ success: true });
 });
 
-// Start Server
+app.post('/api/kestra/events', (req, res) => {
+  const { services, ai, timestamp } = req.body;
+  console.log('📊 Kestra event received:', ai);
+  activityLog.unshift({
+    id: Date.now(),
+    message: `Kestra Analysis: ${ai}`,
+    type: 'info',
+    severity: 'info',
+    timestamp: new Date(timestamp || Date.now())
+  });
+  if (activityLog.length > 50) activityLog.splice(50);
+  res.json({ success: true });
+});
+
+app.post('/api/action/:service/:type', async (req, res) => {
+  const { service, type } = req.params;
+  const serviceMap = { 'auth': 3001, 'payment': 3002, 'notification': 3003 };
+  const port = serviceMap[service];
+
+  if (!port) return res.status(400).json({ success: false, error: 'Invalid service' });
+
+  try {
+    let mode = 'healthy';
+    if (type === 'restart' || type === 'heal') mode = 'healthy';
+    if (type === 'crash' || type === 'down') mode = 'down';
+
+    await axios.post(`http://localhost:${port}/simulate/${mode}`, {}, { timeout: 5000 });
+
+    activityLog.unshift({
+      id: Date.now(),
+      message: `Manual action: ${type} executed on ${service} service`,
+      type: 'action',
+      severity: 'info',
+      timestamp: new Date()
+    });
+
+    res.json({ success: true, message: `${type} executed on ${service}` });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 Sentinel Backend running on http://0.0.0.0:${PORT}`);
+  console.log(`🔍 Continuous health monitoring active (5s intervals)`);
 });

@@ -31,6 +31,8 @@ export interface Incident {
     agentPredictionConfidence: number;
     timeline: IncidentEvent[];
     logs?: string[]; // Optional logs/reasoning dump
+    reasoning?: string; // Raw AI reasoning JSON or string
+    affectedServices?: string[];
 }
 
 export const mockServices: Service[] = [
@@ -41,7 +43,7 @@ export const mockServices: Service[] = [
         status: "healthy",
         uptime: 99.99,
         latency: 45,
-        cpu: 32,
+        cpu: 12,
         memory: 45,
         trend: [40, 42, 45, 48, 45, 42, 40, 38, 42, 45, 45, 42],
     },
@@ -57,48 +59,26 @@ export const mockServices: Service[] = [
         trend: [25, 28, 30, 28, 25, 22, 25, 28, 30, 28, 28, 25],
     },
     {
-        id: "payments-worker",
-        name: "Payments Worker",
+        id: "payment-service",
+        name: "Payment Service",
         type: "worker",
-        status: "degraded",
-        uptime: 98.5,
-        latency: 120,
-        cpu: 85,
-        memory: 70,
-        trend: [60, 70, 80, 90, 100, 120, 110, 115, 120, 125, 120, 118],
-    },
-    {
-        id: "primary-db",
-        name: "Primary DB (Postgres)",
-        type: "database",
         status: "healthy",
-        uptime: 99.99,
-        latency: 12,
-        cpu: 45,
-        memory: 60,
-        trend: [10, 12, 15, 12, 10, 12, 15, 18, 15, 12, 12, 10],
+        uptime: 99.9,
+        latency: 85,
+        cpu: 22,
+        memory: 40,
+        trend: [60, 65, 70, 65, 60, 55, 60, 65, 70, 65, 65, 60],
     },
     {
-        id: "redis-cache",
-        name: "Redis Cache",
-        type: "cache",
-        status: "healthy",
-        uptime: 100,
-        latency: 2,
-        cpu: 10,
-        memory: 25,
-        trend: [2, 3, 2, 2, 3, 2, 2, 2, 3, 2, 2, 2],
-    },
-    {
-        id: "search-service",
-        name: "Search Service",
+        id: "notification-service",
+        name: "Notification Service",
         type: "api",
-        status: "down",
-        uptime: 95.2,
-        latency: 0,
-        cpu: 0,
-        memory: 0,
-        trend: [40, 50, 60, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        status: "healthy",
+        uptime: 99.9,
+        latency: 120,
+        cpu: 48,
+        memory: 55,
+        trend: [100, 110, 120, 115, 110, 105, 110, 115, 120, 115, 115, 110],
     },
 ];
 

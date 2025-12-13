@@ -19,17 +19,27 @@ export default function DashboardPage() {
     useEffect(() => {
         setLiveServices(prev => prev.map(service => {
             const realTime = metrics[service.id];
+            // Find base service to reset uptime when healthy
+            const baseService = mockServices.find(s => s.id === service.id) || service;
+
             if (realTime) {
                 const newTrend = realTime.history.length > 0
-                    ? realTime.history.slice(-12).map(p => p.value)
-                    : service.trend;
+                    ? realTime.history.slice(-12).map(p => p.responseTime || 0)
+                    : baseService.trend;
+
+                const isDown = realTime.currentErrorRate > 0.5;
+                // Recover uptime if healthy, drop if down
+                const currentUptime = isDown
+                    ? Math.max(0, baseService.uptime - 20)
+                    : baseService.uptime;
 
                 return {
                     ...service,
                     latency: realTime.currentResponseTime,
                     cpu: realTime.currentCpu,
-                    status: realTime.currentErrorRate > 0.5 ? "down" : (realTime.currentErrorRate > 0.2 ? "degraded" : "healthy"),
-                    trend: newTrend.length > 0 ? newTrend : service.trend,
+                    uptime: currentUptime.toFixed(2) as any,
+                    status: isDown ? "down" : (realTime.currentErrorRate > 0.2 ? "degraded" : "healthy"),
+                    trend: newTrend.length > 0 ? newTrend : baseService.trend,
                 };
             }
             return service;
@@ -37,6 +47,11 @@ export default function DashboardPage() {
     }, [metrics]);
 
     const activeIncident = incidents.find(i => i.id === activeIncidentId);
+
+    // Calculate real-time stats
+    const totalServices = liveServices.length;
+    const healthyServices = liveServices.filter(s => s.status === "healthy").length;
+    const realUptime = totalServices > 0 ? Math.round((healthyServices / totalServices) * 100) : 100;
 
     return (
         <div className="space-y-8 pb-20">
@@ -46,9 +61,9 @@ export default function DashboardPage() {
             </div>
 
             <HealthSummary
-                uptime={mockMetrics.uptime}
-                servicesUp={liveServices.filter(s => s.status === "healthy").length}
-                totalServices={liveServices.length}
+                uptime={realUptime}
+                servicesUp={healthyServices}
+                totalServices={totalServices}
                 activeIncidents={incidents.filter(i => i.status !== "resolved").length}
             />
 
