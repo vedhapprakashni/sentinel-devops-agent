@@ -19,7 +19,7 @@ export function useIncidents() {
                 const latestInsight = data.insights[0];
 
                 // Parse AI analysis
-                let aiData: { summary?: string; choices?: { message?: { content?: string } }[] } = {};
+                let aiData: any = {};
                 const rawAnalysis = latestInsight.analysis || latestInsight.summary || "";
 
                 try {
