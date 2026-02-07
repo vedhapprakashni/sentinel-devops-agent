@@ -1,0 +1,13 @@
+---
+# GitHub Issue Template Configuration
+# Guides contributors to use appropriate templates and better structure their issues
+
+blank_issues_enabled: false
+
+contact_links:
+  - name: Questions & Discussions
+    url: https://github.com/SKfaizan-786/sentinel-devops-agent/discussions
+    about: Ask questions and discuss ideas about Sentinel (not for bugs/features)
+  - name: Security Vulnerability Report
+    url: https://github.com/SKfaizan-786/sentinel-devops-agent/security/advisories/new
+    about: Report security vulnerabilities privately - DO NOT open public issues
