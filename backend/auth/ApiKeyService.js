@@ -25,7 +25,7 @@ class ApiKeyService {
       `INSERT INTO api_keys (name, key_hash, user_id, organization_id, scoped_permissions, expires_at)
        VALUES ($1, $2, $3, $4, $5, $6)
        RETURNING id, name, user_id, organization_id, scoped_permissions, created_at, expires_at`,
-      [name, keyHash, userId, organizationId, JSON.stringify(scopedPermissions), expiresAt]
+      [name, keyHash, userId, organizationId, scopedPermissions, expiresAt]
     );
     
     return {

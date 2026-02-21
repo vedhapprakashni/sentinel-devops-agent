@@ -45,6 +45,22 @@ router.post('/', requireAuth, requirePermissions('users:write'), async (req, res
     
     // Assign roles if provided
     if (roleIds && roleIds.length > 0) {
+      // Validate all roles exist and belong to target organization
+      const rolesResult = await pool.query(
+        `SELECT id, organization_id FROM roles WHERE id = ANY($1)`,
+        [roleIds]
+      );
+      
+      if (rolesResult.rows.length !== roleIds.length) {
+        return res.status(400).json({ error: 'One or more roles not found' });
+      }
+      
+      const invalidRoles = rolesResult.rows.filter(r => r.organization_id !== targetOrgId);
+      if (invalidRoles.length > 0) {
+        return res.status(403).json({ error: 'Cannot assign roles from different organization' });
+      }
+      
+      // All roles validated, assign them
       for (const roleId of roleIds) {
         await RBACService.assignRole(user.id, roleId);
       }
@@ -245,6 +261,20 @@ router.post('/:id/roles', requireAuth, requirePermissions('users:write', 'roles:
     
     if (userResult.rows[0].organization_id !== req.user.organizationId) {
       return res.status(403).json({ error: 'Cannot modify user from different organization' });
+    }
+    
+    // Verify role exists and belongs to same organization
+    const roleResult = await pool.query(
+      `SELECT organization_id FROM roles WHERE id = $1`,
+      [roleId]
+    );
+    
+    if (roleResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Role not found' });
+    }
+    
+    if (roleResult.rows[0].organization_id !== req.user.organizationId) {
+      return res.status(403).json({ error: 'Cannot assign role from different organization' });
     }
     
     // Assign role

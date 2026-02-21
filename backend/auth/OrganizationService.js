@@ -21,8 +21,8 @@ class OrganizationService {
       
       const organization = result.rows[0];
       
-      // Initialize system roles for the organization
-      await RBACService.initializeSystemRoles(organization.id);
+      // Initialize system roles for the organization (pass client for transaction)
+      await RBACService.initializeSystemRoles(organization.id, client);
       
       await client.query('COMMIT');
       

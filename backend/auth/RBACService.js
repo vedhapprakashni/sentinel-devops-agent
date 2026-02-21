@@ -125,28 +125,56 @@ class RBACService {
   }
 
   /**
-   * Delete role (only if no users assigned)
+   * Delete role (only if no users assigned and not a system role)
    * @param {string} roleId - Role ID
-   * @throws {Error} - If role has users assigned
+   * @throws {Error} - If role has users assigned or is a system role
    */
   async deleteRole(roleId) {
-    // Check if role has users
-    const usersResult = await pool.query(
-      `SELECT COUNT(*) as count FROM user_roles WHERE role_id = $1`,
-      [roleId]
-    );
+    const client = await pool.connect();
     
-    if (parseInt(usersResult.rows[0].count) > 0) {
-      throw new Error('Cannot delete role with assigned users');
+    try {
+      await client.query('BEGIN');
+      
+      // Atomically check and delete role
+      const result = await client.query(
+        `DELETE FROM roles 
+         WHERE id = $1 
+         AND NOT is_system_role 
+         AND NOT EXISTS (SELECT 1 FROM user_roles WHERE role_id = $1)
+         RETURNING id, is_system_role`,
+        [roleId]
+      );
+      
+      if (result.rows.length === 0) {
+        // Check why deletion failed
+        const checkResult = await client.query(
+          `SELECT is_system_role, 
+                  EXISTS(SELECT 1 FROM user_roles WHERE role_id = $1) as has_users
+           FROM roles WHERE id = $1`,
+          [roleId]
+        );
+        
+        if (checkResult.rows.length === 0) {
+          throw new Error('Role not found');
+        }
+        
+        const roleInfo = checkResult.rows[0];
+        if (roleInfo.is_system_role) {
+          throw new Error('Cannot delete system role');
+        }
+        if (roleInfo.has_users) {
+          throw new Error('Cannot delete role with assigned users');
+        }
+      }
+      
+      await client.query('COMMIT');
+      return { success: true };
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
     }
-    
-    // Delete role (cascade will handle role_permissions)
-    await pool.query(
-      `DELETE FROM roles WHERE id = $1`,
-      [roleId]
-    );
-    
-    return { success: true };
   }
 
   /**
@@ -303,20 +331,24 @@ class RBACService {
   /**
    * Initialize system roles for organization
    * @param {string} organizationId - Organization ID
+   * @param {object} client - Optional database client for transaction
    * @returns {Promise<object>} - Created roles
    */
-  async initializeSystemRoles(organizationId) {
-    const client = await pool.connect();
+  async initializeSystemRoles(organizationId, client = null) {
+    const shouldManageTransaction = !client;
+    const dbClient = client || await pool.connect();
     
     try {
-      await client.query('BEGIN');
+      if (shouldManageTransaction) {
+        await dbClient.query('BEGIN');
+      }
       
       // Get all permissions
-      const permissionsResult = await client.query(`SELECT * FROM permissions`);
+      const permissionsResult = await dbClient.query(`SELECT * FROM permissions`);
       const allPermissions = permissionsResult.rows;
       
       // Admin role - all permissions
-      const adminResult = await client.query(
+      const adminResult = await dbClient.query(
         `INSERT INTO roles (name, description, organization_id, is_system_role)
          VALUES ($1, $2, $3, TRUE)
          RETURNING *`,
@@ -326,14 +358,14 @@ class RBACService {
       
       // Assign all permissions to Admin
       for (const perm of allPermissions) {
-        await client.query(
+        await dbClient.query(
           `INSERT INTO role_permissions (role_id, permission_id) VALUES ($1, $2)`,
           [adminRole.id, perm.id]
         );
       }
       
       // Operator role
-      const operatorResult = await client.query(
+      const operatorResult = await dbClient.query(
         `INSERT INTO roles (name, description, organization_id, is_system_role)
          VALUES ($1, $2, $3, TRUE)
          RETURNING *`,
@@ -349,14 +381,14 @@ class RBACService {
       );
       
       for (const perm of operatorPerms) {
-        await client.query(
+        await dbClient.query(
           `INSERT INTO role_permissions (role_id, permission_id) VALUES ($1, $2)`,
           [operatorRole.id, perm.id]
         );
       }
       
       // Viewer role
-      const viewerResult = await client.query(
+      const viewerResult = await dbClient.query(
         `INSERT INTO roles (name, description, organization_id, is_system_role)
          VALUES ($1, $2, $3, TRUE)
          RETURNING *`,
@@ -370,22 +402,28 @@ class RBACService {
       );
       
       for (const perm of viewerPerms) {
-        await client.query(
+        await dbClient.query(
           `INSERT INTO role_permissions (role_id, permission_id) VALUES ($1, $2)`,
           [viewerRole.id, perm.id]
         );
       }
       
-      await client.query('COMMIT');
+      if (shouldManageTransaction) {
+        await dbClient.query('COMMIT');
+      }
       
       return {
         roles: [adminRole, operatorRole, viewerRole]
       };
     } catch (error) {
-      await client.query('ROLLBACK');
+      if (shouldManageTransaction) {
+        await dbClient.query('ROLLBACK');
+      }
       throw error;
     } finally {
-      client.release();
+      if (shouldManageTransaction) {
+        dbClient.release();
+      }
     }
   }
 }

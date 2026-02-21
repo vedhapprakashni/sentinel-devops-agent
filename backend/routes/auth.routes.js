@@ -107,6 +107,21 @@ router.post('/logout-session', requireAuth, async (req, res) => {
       return res.status(400).json({ error: 'Session ID is required' });
     }
     
+    // Verify session ownership before revoking
+    const pool = require('../db/config');
+    const sessionResult = await pool.query(
+      `SELECT user_id FROM refresh_tokens WHERE id = $1`,
+      [sessionId]
+    );
+    
+    if (sessionResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Session not found' });
+    }
+    
+    if (sessionResult.rows[0].user_id !== req.user.userId) {
+      return res.status(403).json({ error: 'Cannot revoke another user\'s session' });
+    }
+    
     await AuthService.logoutSession(sessionId);
     
     res.json({ success: true });
