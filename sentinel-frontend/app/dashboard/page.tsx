@@ -20,15 +20,13 @@ import { ServiceGridSkeleton } from "@/components/dashboard/ServiceCardSkeleton"
 import { IncidentTimelineSkeleton } from "@/components/dashboard/IncidentTimelineSkeleton";
 
 export default function DashboardPage() {
-    const { metrics, refetch: refetchMetrics } = useMetrics({ manual: true });
-    const { incidents, activeIncidentId, setActiveIncidentId, refetch: refetchIncidents } = useIncidents({ manual: true });
+    const { metrics } = useMetrics();
+    const { incidents, activeIncidentId, setActiveIncidentId } = useIncidents({ manual: true });
     const { containers, loading: containersLoading, restartContainer, refetch: refetchContainers } = useContainers({ manual: true });
 
     const handleRefresh = useCallback(() => {
-        refetchMetrics();
-        refetchIncidents();
         refetchContainers();
-    }, [refetchMetrics, refetchIncidents, refetchContainers]);
+    }, [refetchContainers]);
 
     // Track initial load state (skeletons shown only on first load)
     const [initialLoad, setInitialLoad] = useState(true);

@@ -1,3 +1,6 @@
+// Load environment variables
+require('dotenv').config();
+
 const { setupWebSocket } = require('./websocket');
 const express = require('express');
 const cors = require('cors');
@@ -7,12 +10,22 @@ const { listContainers, getContainerHealth } = require('./docker/client');
 const monitor = require('./docker/monitor');
 const healer = require('./docker/healer');
 
+// RBAC Routes
+const authRoutes = require('./routes/auth.routes');
+const usersRoutes = require('./routes/users.routes');
+const rolesRoutes = require('./routes/roles.routes');
+
 const app = express();
-const PORT = 4000;
+const PORT = process.env.PORT || 4000;
 
 // Middleware
 app.use(cors());
 app.use(bodyParser.json());
+
+// RBAC Routes
+app.use('/auth', authRoutes);
+app.use('/api/users', usersRoutes);
+app.use('/api/roles', rolesRoutes);
 
 // --- IN-MEMORY DATABASE ---
 let systemStatus = {
@@ -213,8 +226,8 @@ app.post('/api/action/:service/:type', async (req, res) => {
 
 // --- DOCKER ENDPOINTS ---
 
-// Middleware for ID/Service validation and Auth (mock auth)
-const requireAuth = (req, res, next) => {
+// Middleware for ID/Service validation (mock auth for docker endpoints)
+const requireDockerAuth = (req, res, next) => {
   // In a real app, check 'Authorization' header
   // For now, assume authenticated if internal or trusted
   next();
@@ -272,7 +285,7 @@ app.get('/api/docker/metrics/:id', validateId, (req, res) => {
   res.json(metrics || { error: 'No metrics available' });
 });
 
-app.post('/api/docker/try-restart/:id', requireAuth, validateId, async (req, res) => {
+app.post('/api/docker/try-restart/:id', requireDockerAuth, validateId, async (req, res) => {
   const id = req.params.id;
   const now = Date.now();
   let tracker = restartTracker.get(id) || { attempts: 0, lastAttempt: 0 };
@@ -298,7 +311,7 @@ app.post('/api/docker/try-restart/:id', requireAuth, validateId, async (req, res
   res.json({ allowed: true, ...result });
 });
 
-app.post('/api/docker/restart/:id', requireAuth, validateId, async (req, res) => {
+app.post('/api/docker/restart/:id', requireDockerAuth, validateId, async (req, res) => {
   // Manual override bypasses smart checks, or update tracker manually
   const id = req.params.id;
   // Update tracker so manual restarts count towards limits or reset headers? 
@@ -312,12 +325,12 @@ app.post('/api/docker/restart/:id', requireAuth, validateId, async (req, res) =>
   res.json(result);
 });
 
-app.post('/api/docker/recreate/:id', requireAuth, validateId, async (req, res) => {
+app.post('/api/docker/recreate/:id', requireDockerAuth, validateId, async (req, res) => {
   const result = await healer.recreateContainer(req.params.id);
   res.json(result);
 });
 
-app.post('/api/docker/scale/:service/:replicas', requireAuth, validateScaleParams, async (req, res) => {
+app.post('/api/docker/scale/:service/:replicas', requireDockerAuth, validateScaleParams, async (req, res) => {
   const result = await healer.scaleService(req.params.service, req.params.replicas);
   res.json(result);
 });
