@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowRight, ChevronRight } from 'lucide-react';
+import { ChevronRight } from 'lucide-react';
 
 interface RightSizingTableProps {
     containers: Array<{
