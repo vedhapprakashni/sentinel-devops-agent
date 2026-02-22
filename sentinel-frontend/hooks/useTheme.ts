@@ -1,4 +1,7 @@
+"use client";
+
 import { useState, useEffect } from 'react';
+
 
 type Theme = 'dark' | 'light';
 
