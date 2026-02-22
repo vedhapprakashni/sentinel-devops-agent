@@ -24,7 +24,7 @@ function calculateContainerCost(container, presetKey = 'aws') {
         wasteClass = 'zombie';
     } else if (avgCPU !== null && avgMem !== null) {
         if (avgCPU < 5 && avgMem < 10) wasteClass = 'idle';
-        else if (avgCPU < 20 || avgMem < 30) wasteClass = 'over-provisioned';
+        else if (avgCPU < 20 && avgMem < 30) wasteClass = 'over-provisioned';
     }
 
     const potentialSavings = wasteClass !== 'healthy'

@@ -18,7 +18,7 @@ const CLOUD_PRESETS = [
 
 export default function FinOpsPage() {
     const [preset, setPreset] = useState('aws');
-    const { data, loading, refetch } = useFinOps(preset);
+    const { data, loading, error, refetch } = useFinOps(preset);
 
     return (
         <div className="space-y-8 pb-20">
