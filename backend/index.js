@@ -14,6 +14,7 @@ const healer = require('./docker/healer');
 const authRoutes = require('./routes/auth.routes');
 const usersRoutes = require('./routes/users.routes');
 const rolesRoutes = require('./routes/roles.routes');
+const incidentsRoutes = require('./routes/incidents.routes');
 
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -26,6 +27,7 @@ app.use(bodyParser.json());
 app.use('/auth', authRoutes);
 app.use('/api/users', usersRoutes);
 app.use('/api/roles', rolesRoutes);
+app.use('/api/incidents', incidentsRoutes);
 
 // --- IN-MEMORY DATABASE ---
 let systemStatus = {

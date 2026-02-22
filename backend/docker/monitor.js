@@ -1,9 +1,15 @@
 const { docker } = require('./client');
+const flapDetector = require('../lib/flap-detector');
+const alertCorrelator = require('../lib/alert-correlator');
 
 class ContainerMonitor {
     constructor() {
         this.metrics = new Map();
         this.watchers = new Map();
+        this.healthTimers = new Map();
+        this.containerLabels = new Map();
+        this.lastHealthState = new Map();
+        this.activeIncidents = new Map(); // Store generated incidents
     }
 
     async startMonitoring(containerId) {
@@ -11,6 +17,13 @@ class ContainerMonitor {
 
         try {
             const container = docker.getContainer(containerId);
+            const info = await container.inspect();
+            this.containerLabels.set(containerId, info.Config.Labels);
+
+            // Poll health periodically
+            const healthTimer = setInterval(() => this.checkContainerHealth(containerId), 5000);
+            this.healthTimers.set(containerId, healthTimer);
+
             const stream = await container.stats({ stream: true });
 
             stream.on('data', (chunk) => {
@@ -43,6 +56,12 @@ class ContainerMonitor {
             if (stream.destroy) stream.destroy();
             this.watchers.delete(containerId);
             this.metrics.delete(containerId);
+        }
+        if (this.healthTimers.has(containerId)) {
+            clearInterval(this.healthTimers.get(containerId));
+            this.healthTimers.delete(containerId);
+            this.containerLabels.delete(containerId);
+            this.lastHealthState.delete(containerId);
         }
     }
 
@@ -103,6 +122,43 @@ class ContainerMonitor {
 
     getMetrics(containerId) {
         return this.metrics.get(containerId);
+    }
+
+    async checkContainerHealth(containerId) {
+        try {
+            const container = docker.getContainer(containerId);
+            const info = await container.inspect();
+
+            // Determine if truly unhealthy (from docker healthcheck or state)
+            const isRunning = info.State.Running;
+            const healthStatus = info.State.Health ? info.State.Health.Status : (isRunning ? 'healthy' : 'unhealthy');
+            const isHealthy = healthStatus === 'healthy' || healthStatus === 'starting';
+
+            const lastState = this.lastHealthState.get(containerId);
+            if (lastState !== isHealthy) {
+                this.lastHealthState.set(containerId, isHealthy);
+
+                // State changed! Run through flap detector
+                const flapResult = flapDetector.record(containerId, isHealthy);
+
+                if (!isHealthy && !flapResult.suppressAlert) {
+                    // Generate an alert and pass to correlator
+                    const labels = this.containerLabels.get(containerId) || {};
+                    const alert = { containerId, labels, type: 'container_failure', isHealthy };
+                    const groups = alertCorrelator.add(alert);
+
+                    // Store the groups for routes to pick up
+                    // In a real system, would broadcast event. We will just expose it.
+                    this.activeCorrelatedGroups = groups;
+                }
+            }
+        } catch (error) {
+            // Container might be gone
+        }
+    }
+
+    getCorrelatedGroups() {
+        return alertCorrelator.correlate();
     }
 }
 
