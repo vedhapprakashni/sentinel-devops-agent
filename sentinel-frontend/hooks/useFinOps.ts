@@ -22,23 +22,26 @@ export function useFinOps(preset: string = 'aws') {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
-    const fetchFinOps = async () => {
+    const fetchFinOps = async (signal?: AbortSignal) => {
         try {
             setLoading(true);
-            const res = await fetch(`http://localhost:4000/api/finops/summary?preset=${preset}`);
+            const res = await fetch(`http://localhost:4000/api/finops/summary?preset=${preset}`, { signal });
             if (!res.ok) throw new Error('Failed to fetch FinOps data');
             const json = await res.json();
             setData(json);
             setError(null);
-        } catch (err: any) {
-            setError(err.message);
+        } catch (err: unknown) {
+            if (err instanceof DOMException && err.name === 'AbortError') return;
+            setError(err instanceof Error ? err.message : 'Unknown error');
         } finally {
             setLoading(false);
         }
     };
 
     useEffect(() => {
-        fetchFinOps();
+        const controller = new AbortController();
+        fetchFinOps(controller.signal);
+        return () => controller.abort();
     }, [preset]);
 
     return { data, loading, error, refetch: fetchFinOps };
