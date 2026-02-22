@@ -1,6 +1,7 @@
 "use client";
 
 import { ChevronRight } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 interface RightSizingTableProps {
     containers: Array<{
@@ -76,8 +77,4 @@ export function RightSizingTable({ containers }: RightSizingTableProps) {
             </div>
         </div>
     );
-}
-
-function cn(...classes: any[]) {
-    return classes.filter(Boolean).join(' ');
 }

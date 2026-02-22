@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react';
 export interface FinOpsReport {
     totalMonthlyEstimate: string;
     totalPotentialSavings: string;
-    wastePercent: string;
+    wastePercent: string | number;
     cloudPreset: string;
     containers: Array<{
         containerId: string;
@@ -25,7 +25,7 @@ export function useFinOps(preset: string = 'aws') {
     const fetchFinOps = async (signal?: AbortSignal) => {
         try {
             setLoading(true);
-            const res = await fetch(`http://localhost:4000/api/finops/summary?preset=${preset}`, { signal });
+            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'}/api/finops/summary?preset=${preset}`, { signal });
             if (!res.ok) throw new Error('Failed to fetch FinOps data');
             const json = await res.json();
             setData(json);

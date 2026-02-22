@@ -11,11 +11,11 @@ router.get('/summary', async (req, res) => {
 
         const totalSpend = reports.reduce((s, r) => s + r.monthlyEstimate, 0);
         const totalSavings = reports.reduce((s, r) => s + r.potentialSavingsMonthly, 0);
-        const wastePercent = totalSpend > 0 ? (totalSavings / totalSpend * 100).toFixed(1) : 0;
+        const wastePercent = totalSpend > 0 ? parseFloat((totalSavings / totalSpend * 100).toFixed(1)) : 0;
 
         res.json({
-            totalMonthlyEstimate: totalSpend.toFixed(2),
-            totalPotentialSavings: totalSavings.toFixed(2),
+            totalMonthlyEstimate: parseFloat(totalSpend.toFixed(2)),
+            totalPotentialSavings: parseFloat(totalSavings.toFixed(2)),
             wastePercent,
             cloudPreset: preset,
             containers: reports.sort((a, b) => b.monthlyEstimate - a.monthlyEstimate),

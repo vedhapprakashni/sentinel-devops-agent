@@ -59,7 +59,7 @@ export function SavingsCard({ totalMonthlyEstimate, totalPotentialSavings, waste
                 <div className="relative w-full h-4 bg-muted rounded-full overflow-hidden">
                     <motion.div
                         initial={{ width: 0 }}
-                        animate={{ width: `${wastePercent}%` }}
+                        animate={{ width: `${Math.min(Math.max(parseFloat(String(wastePercent)) || 0, 0), 100)}%` }}
                         transition={{ duration: 1, delay: 0.5 }}
                         className="absolute top-0 left-0 h-full bg-green-500"
                     />
