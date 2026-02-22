@@ -24,20 +24,26 @@ export function WasteHeatmap({ containers }: WasteHeatmapProps) {
                 </div>
             </div>
             <div className="p-6">
-                <div className="grid grid-cols-5 sm:grid-cols-8 md:grid-cols-10 gap-2 py-4">
-                    {containers.map((c, i) => (
-                        <div
-                            key={c.name + i}
-                            title={`${c.name} (${c.wasteClass})\nCPU: ${c.avgCPUPercent ?? 'N/A'}%\nMem: ${c.avgMemPercent ?? 'N/A'}%`}
-                            className={cn(
-                                "aspect-square rounded-md cursor-pointer transition-all hover:scale-110",
-                                c.wasteClass === 'healthy' && "bg-green-500/80 shadow-[0_0_10px_rgba(34,197,94,0.3)]",
-                                c.wasteClass === 'over-provisioned' && "bg-yellow-500/80 shadow-[0_0_10px_rgba(234,179,8,0.3)]",
-                                c.wasteClass === 'idle' && "bg-orange-500/80 shadow-[0_0_10px_rgba(249,115,22,0.3)]",
-                                c.wasteClass === 'zombie' && "bg-red-500/80 shadow-[0_0_10px_rgba(239,68,68,0.3)]",
-                            )} />
-                    ))}
-                </div>
+                {containers.length === 0 ? (
+                    <div className="flex items-center justify-center py-12 text-muted-foreground text-sm">
+                        No containers available to analyze.
+                    </div>
+                ) : (
+                    <div className="grid grid-cols-5 sm:grid-cols-8 md:grid-cols-10 gap-2 py-4">
+                        {containers.map((c) => (
+                            <div
+                                key={c.name}
+                                title={`${c.name} (${c.wasteClass})\nCPU: ${c.avgCPUPercent ?? 'N/A'}%\nMem: ${c.avgMemPercent ?? 'N/A'}%`}
+                                className={cn(
+                                    "aspect-square rounded-md cursor-pointer transition-all hover:scale-110",
+                                    c.wasteClass === 'healthy' && "bg-green-500/80 shadow-[0_0_10px_rgba(34,197,94,0.3)]",
+                                    c.wasteClass === 'over-provisioned' && "bg-yellow-500/80 shadow-[0_0_10px_rgba(234,179,8,0.3)]",
+                                    c.wasteClass === 'idle' && "bg-orange-500/80 shadow-[0_0_10px_rgba(249,115,22,0.3)]",
+                                    c.wasteClass === 'zombie' && "bg-red-500/80 shadow-[0_0_10px_rgba(239,68,68,0.3)]",
+                                )} />
+                        ))}
+                    </div>
+                )}
             </div>
         </div>
     );

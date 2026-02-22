@@ -1,4 +1,5 @@
 {
+    "lastUpdated": "2026-02-22T00:00:00Z",
     "aws": {
         "name": "AWS EC2 t3.medium",
         "cpuHour": 0.0208,

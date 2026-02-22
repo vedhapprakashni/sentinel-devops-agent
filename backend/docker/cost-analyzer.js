@@ -1,6 +1,13 @@
 const store = require('../db/metrics-store');
 const PRICING_PRESETS = require('../config/cloud-pricing.json');
 
+/**
+ * Calculates the estimated monthly cost and resource waste classification for a container.
+ * 
+ * @param {Object} container - The container object from Dockerode
+ * @param {string} [presetKey='aws'] - The cloud pricing preset to use
+ * @returns {Object} The cost analysis report including waste classification and potential savings
+ */
 function calculateContainerCost(container, presetKey = 'aws') {
     const preset = PRICING_PRESETS[presetKey] || PRICING_PRESETS.aws;
     const { cpuHour, ramGBHour } = preset;
