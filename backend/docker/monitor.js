@@ -5,6 +5,7 @@ class ContainerMonitor {
     constructor() {
         this.metrics = new Map();
         this.watchers = new Map();
+        this.lastStorePush = new Map();
     }
 
     async startMonitoring(containerId) {
@@ -19,10 +20,16 @@ class ContainerMonitor {
                     const stats = JSON.parse(chunk.toString());
                     const parsed = this.parseStats(stats);
                     this.metrics.set(containerId, parsed);
-                    store.push(containerId, {
-                        cpuPercent: parseFloat(parsed.cpu),
-                        memPercent: parseFloat(parsed.memory.percent)
-                    });
+
+                    const now = Date.now();
+                    const lastPush = this.lastStorePush.get(containerId) || 0;
+                    if (now - lastPush >= 60_000) {
+                        store.push(containerId, {
+                            cpuPercent: parseFloat(parsed.cpu),
+                            memPercent: parseFloat(parsed.memory.percent)
+                        });
+                        this.lastStorePush.set(containerId, now);
+                    }
                 } catch (e) {
                     // Ignore parse errors from partial chunks
                 }

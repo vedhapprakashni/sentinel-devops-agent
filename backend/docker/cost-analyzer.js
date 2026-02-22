@@ -35,8 +35,8 @@ function calculateContainerCost(container, presetKey = 'aws') {
         containerId: container.id || container.Id,
         name: container.name || (container.Names?.[0]?.replace('/', '')),
         monthlyEstimate: parseFloat(monthlyEstimate.toFixed(2)),
-        avgCPUPercent: avgCPU ? parseFloat(avgCPU.toFixed(1)) : null,
-        avgMemPercent: avgMem ? parseFloat(avgMem.toFixed(1)) : null,
+        avgCPUPercent: avgCPU !== null ? parseFloat(avgCPU.toFixed(1)) : null,
+        avgMemPercent: avgMem !== null ? parseFloat(avgMem.toFixed(1)) : null,
         wasteClass,
         potentialSavingsMonthly: parseFloat(potentialSavings.toFixed(2)),
         recommendation: wasteClass === 'zombie'
