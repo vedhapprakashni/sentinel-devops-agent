@@ -9,7 +9,7 @@ class ContainerMonitor {
         this.healthTimers = new Map();
         this.containerLabels = new Map();
         this.lastHealthState = new Map();
-        this.activeIncidents = new Map(); // Store generated incidents
+
         this.activeCorrelatedGroups = []; // Cached correlated alert groups
     }
 
@@ -154,7 +154,13 @@ class ContainerMonitor {
                 }
             }
         } catch (error) {
-            // Container might be gone
+            if (error.statusCode === 404) {
+                // Container is confirmed gone — stop polling
+                console.warn(`Container ${containerId} no longer exists, stopping monitoring.`);
+                this.stopMonitoring(containerId);
+            } else {
+                console.error(`Health check failed for ${containerId}:`, error.message);
+            }
         }
     }
 
