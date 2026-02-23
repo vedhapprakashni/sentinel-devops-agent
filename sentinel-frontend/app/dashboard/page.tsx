@@ -20,15 +20,13 @@ import { ServiceGridSkeleton } from "@/components/dashboard/ServiceCardSkeleton"
 import { IncidentTimelineSkeleton } from "@/components/dashboard/IncidentTimelineSkeleton";
 
 export default function DashboardPage() {
-    const { metrics, refetch: refetchMetrics } = useMetrics({ manual: true });
-    const { incidents, activeIncidentId, setActiveIncidentId, refetch: refetchIncidents } = useIncidents({ manual: true });
+    const { metrics } = useMetrics();
+    const { incidents, activeIncidentId, setActiveIncidentId } = useIncidents({ manual: true });
     const { containers, loading: containersLoading, restartContainer, refetch: refetchContainers } = useContainers({ manual: true });
 
     const handleRefresh = useCallback(() => {
-        refetchMetrics();
-        refetchIncidents();
         refetchContainers();
-    }, [refetchMetrics, refetchIncidents, refetchContainers]);
+    }, [refetchContainers]);
 
     // Track initial load state (skeletons shown only on first load)
     const [initialLoad, setInitialLoad] = useState(true);
@@ -142,7 +140,7 @@ export default function DashboardPage() {
 
                     {/* Main Content Grid */}
                     <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                        {/* Left Column: Charts & Services (2/3 width) */}
+                        {/* Left Column: Charts (2/3 width) */}
                         <div className="lg:col-span-2 space-y-8">
                             {/* Metrics Charts */}
                             {isLoading ? (
@@ -150,25 +148,6 @@ export default function DashboardPage() {
                             ) : (
                                 <MetricsCharts metrics={metrics} />
                             )}
-
-                            {/* Services Section */}
-                            <div>
-                                <div className="flex items-center justify-between mb-4">
-                                    <h2 className="text-xl font-semibold text-foreground">Monitored Services</h2>
-                                    <span className="text-sm text-muted-foreground flex items-center gap-2">
-                                        <span className="relative flex h-2 w-2">
-                                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-                                            <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
-                                        </span>
-                                        Live Updates
-                                    </span>
-                                </div>
-                                {isLoading ? (
-                                    <ServiceGridSkeleton count={6} />
-                                ) : (
-                                    <ServiceGrid services={liveServices} />
-                                )}
-                            </div>
 
                             {/* Docker Containers Section */}
                             {containersLoading ? (
@@ -247,6 +226,25 @@ export default function DashboardPage() {
                                 )}
                             </div>
                         </div>
+                    </div>
+
+                    {/* Monitored Services — Full Width */}
+                    <div>
+                        <div className="flex items-center justify-between mb-4">
+                            <h2 className="text-xl font-semibold text-foreground">Monitored Services</h2>
+                            <span className="text-sm text-muted-foreground flex items-center gap-2">
+                                <span className="relative flex h-2 w-2">
+                                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                                    <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
+                                </span>
+                                Live Updates
+                            </span>
+                        </div>
+                        {isLoading ? (
+                            <ServiceGridSkeleton count={mockServices.length} />
+                        ) : (
+                            <ServiceGrid services={liveServices} />
+                        )}
                     </div>
                 </div>
             </div>

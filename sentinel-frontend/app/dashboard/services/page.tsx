@@ -6,7 +6,6 @@ import { Plus } from "lucide-react";
 
 export default function ServicesPage() {
     return (
-    return (
         <div>
             <DashboardHeader />
             <div className="p-4 lg:p-6">
@@ -20,11 +19,9 @@ export default function ServicesPage() {
                             <Plus className="h-4 w-4" /> Add Service
                         </Button>
                     </div>
-
                     <ServiceGrid services={mockServices} />
                 </div>
             </div>
         </div>
-    );
     );
 }
