@@ -2,7 +2,7 @@
 
 import { DashboardHeader } from "@/components/layout/DashboardHeader";
 import { IncidentCard } from "@/components/dashboard/IncidentCard";
-import { Suspense, useState, useCallback, useEffect } from "react";
+import { Suspense, useState, useCallback, useEffect, useMemo } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { Activity, Clock, AlertCircle, FileWarning } from "lucide-react";
 import { IncidentTable } from "@/components/incidents/IncidentTable";
@@ -86,38 +86,51 @@ function IncidentsContent() {
     }, [filters, search, sortConfig, page, pageSize, router]);
 
     const [correlatedGroups, setCorrelatedGroups] = useState<CorrelatedGroupData[]>([]);
-
-    const fetchCorrelatedGroups = useCallback(async () => {
-        try {
-            const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
-            const res = await fetch(`${apiUrl}/incidents/correlated`);
-            if (!res.ok) throw new Error('Failed to fetch correlated groups');
-            const data = await res.json();
-            setCorrelatedGroups(data.groups || []);
-        } catch (err) {
-            console.error('Error fetching correlated groups:', err);
-        }
-    }, []);
+    const [fetchError, setFetchError] = useState<string | null>(null);
 
     useEffect(() => {
-        // Fetch initially and set up a basic poll or just fetch once
+        const controller = new AbortController();
+
+        const fetchCorrelatedGroups = async () => {
+            try {
+                const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
+                const res = await fetch(`${apiUrl}/incidents/correlated`, {
+                    signal: controller.signal,
+                });
+                if (!res.ok) throw new Error(`Failed to fetch correlated groups (${res.status})`);
+                const data = await res.json();
+                setCorrelatedGroups(data.groups || []);
+                setFetchError(null);
+            } catch (err: unknown) {
+                if (err instanceof Error && err.name === 'AbortError') return;
+                const message = err instanceof Error ? err.message : 'Unknown error';
+                console.error('Error fetching correlated groups:', message);
+                setFetchError(message);
+            }
+        };
+
         fetchCorrelatedGroups();
         const interval = setInterval(fetchCorrelatedGroups, 10000);
-        return () => clearInterval(interval);
-    }, [fetchCorrelatedGroups]);
 
-    // Compute standalone vs grouped incidents
-    const groupedServiceIds = new Set<string>();
-    correlatedGroups.forEach(g => {
-        g.affectedContainers.forEach(c => groupedServiceIds.add(c));
-    });
+        return () => {
+            controller.abort();
+            clearInterval(interval);
+        };
+    }, []);
 
-    const standaloneIncidents = incidents.filter(i => !groupedServiceIds.has(i.serviceId));
-    // Recompute total pages based on standalone incidents + groups length? 
-    // Wait, the hook `useIncidentHistory` already does pagination on the ALL incidents. 
-    // To properly do it, we should maybe reconsider pagination, but for now we filter the current page.
-    // If we want to be exact:
-    const visibleCount = standaloneIncidents.length + correlatedGroups.length;
+    // Memoize derived values to avoid recomputation on every render
+    const groupedServiceIds = useMemo(() => {
+        const ids = new Set<string>();
+        correlatedGroups.forEach(g => {
+            g.affectedContainers.forEach(c => ids.add(c));
+        });
+        return ids;
+    }, [correlatedGroups]);
+
+    const standaloneIncidents = useMemo(
+        () => incidents.filter(i => !groupedServiceIds.has(i.serviceId)),
+        [incidents, groupedServiceIds]
+    );
 
     const handleSort = useCallback((key: string) => {
         setSortConfig((prev) => ({
@@ -242,6 +255,14 @@ function IncidentsContent() {
                     {totalCount} Incident{totalCount !== 1 && "s"} Found
                 </h2>
             </div>
+
+            {/* Correlation fetch error */}
+            {fetchError && (
+                <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 text-sm flex items-center gap-2">
+                    <AlertCircle className="h-4 w-4 shrink-0" />
+                    <span>Failed to load correlated groups: {fetchError}</span>
+                </div>
+            )}
 
             {/* Table or Empty/Loading State */}
             {isLoading ? (

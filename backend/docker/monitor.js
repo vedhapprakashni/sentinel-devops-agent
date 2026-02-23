@@ -1,6 +1,7 @@
 const { docker } = require('./client');
 const flapDetector = require('../lib/flap-detector');
 const alertCorrelator = require('../lib/alert-correlator');
+const dependencyGraph = require('../lib/dependency-graph');
 
 class ContainerMonitor {
     constructor() {
@@ -8,6 +9,7 @@ class ContainerMonitor {
         this.watchers = new Map();
         this.healthTimers = new Map();
         this.containerLabels = new Map();
+        this.containerInfoCache = new Map(); // Full inspect data for dependency graph
         this.lastHealthState = new Map();
 
         this.activeCorrelatedGroups = []; // Cached correlated alert groups
@@ -20,6 +22,10 @@ class ContainerMonitor {
             const container = docker.getContainer(containerId);
             const info = await container.inspect();
             this.containerLabels.set(containerId, info.Config.Labels);
+            this.containerInfoCache.set(containerId, info);
+
+            // Rebuild dependency graph from all known containers
+            dependencyGraph.populateFromContainers([...this.containerInfoCache.values()]);
 
             // Poll health periodically
             const healthTimer = setInterval(() => this.checkContainerHealth(containerId), 5000);
@@ -64,6 +70,11 @@ class ContainerMonitor {
             this.containerLabels.delete(containerId);
             this.lastHealthState.delete(containerId);
         }
+        // Clean up flap history to prevent stale timestamps on restart
+        flapDetector.clear(containerId);
+        // Remove container from dependency graph
+        dependencyGraph.clearContainer(containerId);
+        this.containerInfoCache.delete(containerId);
     }
 
     parseStats(stats) {

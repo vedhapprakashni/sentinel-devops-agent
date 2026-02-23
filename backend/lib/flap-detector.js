@@ -23,6 +23,15 @@ class FlapDetector {
         }
         return { flapping: false, suppressAlert: state.suppressed };
     }
+
+    /**
+     * Clear flap history for a container.
+     * Must be called when a container stops being monitored to prevent
+     * stale flip timestamps from carrying over on restart.
+     */
+    clear(containerId) {
+        this.history.delete(containerId);
+    }
 }
 
 module.exports = new FlapDetector();

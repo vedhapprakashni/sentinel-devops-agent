@@ -1,9 +1,10 @@
 const express = require('express');
 const router = express.Router();
 const monitor = require('../docker/monitor');
+const { requireAuth } = require('../auth/middleware');
 
 // GET /api/incidents/correlated
-router.get('/correlated', (req, res) => {
+router.get('/correlated', requireAuth, (req, res) => {
     try {
         const groups = monitor.getCorrelatedGroups() || [];
         res.json({ success: true, groups });
