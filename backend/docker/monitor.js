@@ -11,8 +11,6 @@ class ContainerMonitor {
         this.containerLabels = new Map();
         this.containerInfoCache = new Map(); // Full inspect data for dependency graph
         this.lastHealthState = new Map();
-
-        this.activeCorrelatedGroups = []; // Cached correlated alert groups
     }
 
     async startMonitoring(containerId) {
@@ -27,11 +25,13 @@ class ContainerMonitor {
             // Rebuild dependency graph from all known containers
             dependencyGraph.populateFromContainers([...this.containerInfoCache.values()]);
 
-            // Poll health periodically
+            // Obtain stats stream BEFORE starting the health timer,
+            // so a stats() failure doesn't leave an orphaned interval.
+            const stream = await container.stats({ stream: true });
+
+            // Only start polling health after stats stream is established
             const healthTimer = setInterval(() => this.checkContainerHealth(containerId), 5000);
             this.healthTimers.set(containerId, healthTimer);
-
-            const stream = await container.stats({ stream: true });
 
             stream.on('data', (chunk) => {
                 try {
@@ -54,6 +54,9 @@ class ContainerMonitor {
             this.watchers.set(containerId, stream);
         } catch (error) {
             console.error(`Failed to start monitoring ${containerId}:`, error);
+            // Clean up any partially-set state (labels, cache) on failure
+            this.containerLabels.delete(containerId);
+            this.containerInfoCache.delete(containerId);
         }
     }
 
@@ -157,11 +160,7 @@ class ContainerMonitor {
                     // Generate an alert and pass to correlator
                     const labels = this.containerLabels.get(containerId) || {};
                     const alert = { containerId, labels, type: 'container_failure', isHealthy };
-                    const groups = alertCorrelator.add(alert);
-
-                    // Store the groups for routes to pick up
-                    // In a real system, would broadcast event. We will just expose it.
-                    this.activeCorrelatedGroups = groups;
+                    alertCorrelator.add(alert);
                 }
             }
         } catch (error) {
@@ -176,7 +175,10 @@ class ContainerMonitor {
     }
 
     getCorrelatedGroups() {
-        return this.activeCorrelatedGroups;
+        // Re-derive from correlator on each call. Now that groupId is
+        // deterministic, this is safe and keeps data current (respects
+        // the 60-second correlation window, auto-expiring recovered groups).
+        return alertCorrelator.correlate();
     }
 }
 
