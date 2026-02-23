@@ -32,13 +32,14 @@ export function CorrelatedIncidentGroup({ group, incidents }: CorrelatedIncident
                         🔗 Correlated Incident Group
                     </span>
                     <p className="text-sm text-white font-medium">
-                        1 Root Cause → {Math.max(0, group.blastRadius - 1)} Affected Services
+                        1 Root Cause → {Math.max(0, group.affectedContainers.length - 1)} Affected Services
                     </p>
                 </div>
                 <div className="text-right">
                     <span className="text-xs text-muted-foreground block">{group.suppressedAlerts} alerts suppressed</span>
                     <button
                         onClick={() => setExpanded(!expanded)}
+                        aria-expanded={expanded}
                         className="text-xs text-orange-400 hover:text-orange-300 mt-1 flex items-center justify-end gap-1 w-full"
                     >
                         {expanded ? <><ChevronUp className="h-3 w-3" /> Hide Details</> : <><ChevronDown className="h-3 w-3" /> Show {incidents.length} Incidents</>}
