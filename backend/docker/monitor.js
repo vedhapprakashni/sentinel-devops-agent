@@ -10,6 +10,7 @@ class ContainerMonitor {
         this.containerLabels = new Map();
         this.lastHealthState = new Map();
         this.activeIncidents = new Map(); // Store generated incidents
+        this.activeCorrelatedGroups = []; // Cached correlated alert groups
     }
 
     async startMonitoring(containerId) {
@@ -158,7 +159,7 @@ class ContainerMonitor {
     }
 
     getCorrelatedGroups() {
-        return alertCorrelator.correlate();
+        return this.activeCorrelatedGroups;
     }
 }
 
