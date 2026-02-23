@@ -25,17 +25,39 @@ class AlertCorrelator {
             .map(([projectKey, alerts]) => {
                 const sorted = alerts.sort((a, b) => a.ts - b.ts);
                 const rootCauseId = sorted[0].containerId;
-                // Check if rootCause has any dependents or is just shared by project
+
+                // Only consult the dependency graph — alerts.length > 1 is already
+                // guaranteed by the .filter() above so it must not be used here.
                 const deps = dependencyGraph.getDependencies(rootCauseId);
-                const isSharedDependency = deps.length > 0 || alerts.length > 1 ? 1 : 0;
+                const isSharedDependency = deps.length > 0 ? 1 : 0;
+
+                // Build correlation signals explaining why these alerts are grouped
+                const correlationSignals = ['same_compose_project'];
+                if (isSharedDependency) correlationSignals.push('shared_dependency');
+                if (alerts.length > 2) correlationSignals.push('cascade_pattern');
+
+                // Root-cause probability: higher when the dependency graph confirms
+                // a shared dependency, lower for project-only correlation
+                const rootCauseProbability = isSharedDependency
+                    ? Math.min(0.95, 0.7 + (deps.length * 0.05))
+                    : Math.min(0.8, 0.5 + (alerts.length * 0.05));
+
+                // Deterministic groupId from sorted container IDs for stable
+                // React keys and client-side deduplication
+                const stableKey = alerts
+                    .map(a => a.containerId)
+                    .sort()
+                    .join('_');
 
                 return {
-                    groupId: `grp_${projectKey}_${Date.now()}`,
+                    groupId: `grp_${projectKey}_${stableKey}`,
                     rootCauseContainerId: rootCauseId,
+                    rootCauseProbability,
                     affectedContainers: alerts.map(a => a.containerId),
                     blastRadius: alerts.length + (2 * isSharedDependency),
+                    correlationSignals,
                     suppressedAlerts: alerts.length - 1,
-                }
+                };
             });
     }
 }
