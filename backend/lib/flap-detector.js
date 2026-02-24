@@ -12,7 +12,12 @@ class FlapDetector {
         const state = this.history.get(containerId);
         const now = Date.now();
         state.flips = state.flips.filter(t => now - t < this.windowMs);
-        state.flips.push(now);
+
+        // Auto-clear suppression if flips have aged out of the window
+        if (state.suppressed && state.flips.length < this.maxFlips) {
+            state.suppressed = false;
+        }
+
         if (state.flips.length >= this.maxFlips) {
             state.suppressed = true;
             return { flapping: true, suppressAlert: true };

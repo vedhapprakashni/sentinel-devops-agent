@@ -40,6 +40,7 @@ export function CorrelatedIncidentGroup({ group, incidents }: CorrelatedIncident
                     <button
                         onClick={() => setExpanded(!expanded)}
                         aria-expanded={expanded}
+                        aria-controls={`group-details-${group.groupId}`}
                         className="text-xs text-orange-400 hover:text-orange-300 mt-1 flex items-center justify-end gap-1 w-full"
                     >
                         {expanded ? <><ChevronUp className="h-3 w-3" /> Hide Details</> : <><ChevronDown className="h-3 w-3" /> Show {incidents.length} Incidents</>}
@@ -58,7 +59,7 @@ export function CorrelatedIncidentGroup({ group, incidents }: CorrelatedIncident
             </div>
 
             {expanded && (
-                <div className="mt-4 pt-4 border-t border-orange-500/20">
+                <div id={`group-details-${group.groupId}`} className="mt-4 pt-4 border-t border-orange-500/20">
                     <IncidentTable
                         incidents={incidents}
                         onSort={() => { }}
