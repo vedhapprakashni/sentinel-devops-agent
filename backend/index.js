@@ -18,6 +18,9 @@ const rolesRoutes = require('./routes/roles.routes');
 // SLO Routes
 const sloRoutes = require('./routes/slo.routes');
 
+// Distributed Traces Routes
+const traceRoutes = require('./routes/traces.routes');
+
 const app = express();
 const PORT = process.env.PORT || 4000;
 
@@ -32,6 +35,9 @@ app.use('/api/roles', rolesRoutes);
 
 // SLO Routes
 app.use('/api/slo', sloRoutes);
+
+// Distributed Traces Routes
+app.use('/api/traces', traceRoutes);
 
 // --- IN-MEMORY DATABASE ---
 let systemStatus = {
