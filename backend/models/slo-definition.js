@@ -26,8 +26,8 @@ function validate(data) {
 
     if (data.targetAvailability === undefined || typeof data.targetAvailability !== 'number') {
         errors.push('targetAvailability is required and must be a number');
-    } else if (data.targetAvailability < 90 || data.targetAvailability > 99.999) {
-        errors.push('targetAvailability must be between 90 and 99.999');
+    } else if (!VALID_TARGETS.includes(data.targetAvailability)) {
+        errors.push(`targetAvailability must be one of: ${VALID_TARGETS.join(', ')}`);
     }
 
     if (!data.trackingWindow || !VALID_WINDOWS.includes(data.trackingWindow)) {
