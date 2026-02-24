@@ -17,6 +17,7 @@ export function Footer() {
 
                     <div className="flex gap-6 text-sm text-muted-foreground">
                         <Link href="/privacy" className="hover:text-primary">Privacy</Link>
+                        <Link href="/contributors" className="hover:text-primary">Contributors</Link>
                         <Link href="#" className="hover:text-primary">Terms</Link>
                         <Link href="#" className="hover:text-primary">Twitter</Link>
                         <Link href="#" className="hover:text-primary">GitHub</Link>
