@@ -150,7 +150,7 @@ function seedDemoData() {
         },
     ];
 
-    demoSLOs.forEach(slo => create(slo));
+demoSLOs.forEach(slo => { create(slo); });  
 }
 
 // Auto-seed
