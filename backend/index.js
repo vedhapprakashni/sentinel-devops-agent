@@ -18,9 +18,6 @@ const rolesRoutes = require('./routes/roles.routes');
 // SLO Routes
 const sloRoutes = require('./routes/slo.routes');
 
-// Runbook Routes
-const runbookRoutes = require('./routes/runbooks.routes');
-
 const app = express();
 const PORT = process.env.PORT || 4000;
 
@@ -36,9 +33,7 @@ app.use('/api/roles', rolesRoutes);
 // SLO Routes
 app.use('/api/slo', sloRoutes);
 
-// Runbook Routes
-app.use('/api/runbooks', runbookRoutes);
-
+// --- IN-MEMORY DATABASE ---
 let systemStatus = {
   services: {
     auth: { status: 'unknown', code: 0, lastUpdated: null },
