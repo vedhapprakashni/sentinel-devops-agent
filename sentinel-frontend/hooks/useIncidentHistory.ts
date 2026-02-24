@@ -25,7 +25,8 @@ interface UseIncidentHistoryProps {
 }
 
 interface UseIncidentHistoryResult {
-    incidents: Incident[];
+    incidents: Incident[]; // This is the paginated slice
+    allFilteredIncidents: Incident[]; // The full unpaginated filtered dataset
     isLoading: boolean;
     totalCount: number;
     totalActive: number;
@@ -254,6 +255,7 @@ export function useIncidentHistory({
 
     return {
         incidents: paginatedIncidents,
+        allFilteredIncidents: sortedIncidents,
         isLoading,
         totalCount: sortedIncidents.length,
         totalActive,

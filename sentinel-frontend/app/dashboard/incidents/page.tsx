@@ -1,7 +1,7 @@
 "use client";
 
 import { DashboardHeader } from "@/components/layout/DashboardHeader";
-import { IncidentCard } from "@/components/dashboard/IncidentCard";
+
 import { Suspense, useState, useCallback, useEffect, useMemo } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { Activity, Clock, AlertCircle, FileWarning } from "lucide-react";
@@ -53,6 +53,7 @@ function IncidentsContent() {
     const [page, setPage] = useState(Number(searchParams.get("page")) || 1);
     const [pageSize, setPageSize] = useState(Number(searchParams.get("pageSize")) || 10);
 
+<<<<<<< HEAD
     const { incidents, isLoading, totalCount, totalActive, totalCritical, allServices } = useIncidentHistory({
             filters,
             search,
@@ -60,6 +61,15 @@ function IncidentsContent() {
             page,
             pageSize,
         });
+=======
+    const { incidents, allFilteredIncidents, isLoading, totalCount, totalActive, totalCritical, allServices } = useIncidentHistory({
+        filters,
+        search,
+        sort: sortConfig,
+        page,
+        pageSize,
+    });
+>>>>>>> eb2e335 (fix(incidents): fix correlated incidents pagination data flow)
 
     // Sync URL with state
     useEffect(() => {
@@ -127,10 +137,17 @@ function IncidentsContent() {
         return ids;
     }, [correlatedGroups]);
 
-    const standaloneIncidents = useMemo(
-        () => incidents.filter(i => !groupedServiceIds.has(i.serviceId)),
-        [incidents, groupedServiceIds]
+    const standaloneIncidentsFull = useMemo(
+        () => allFilteredIncidents.filter(i => !groupedServiceIds.has(i.serviceId)),
+        [allFilteredIncidents, groupedServiceIds]
     );
+
+    const paginatedStandaloneIncidents = useMemo(() => {
+        const startIndex = (page - 1) * pageSize;
+        return standaloneIncidentsFull.slice(startIndex, startIndex + pageSize);
+    }, [standaloneIncidentsFull, page, pageSize]);
+
+    const standaloneCount = standaloneIncidentsFull.length;
 
     const handleSort = useCallback((key: string) => {
         setSortConfig((prev) => ({
@@ -156,7 +173,7 @@ function IncidentsContent() {
         setPage(1);
     }, []);
 
-    const totalPages = Math.ceil(totalCount / pageSize);
+    const totalPages = Math.ceil(standaloneCount / pageSize);
 
     return (
         <div className="w-full max-w-full overflow-x-hidden">
@@ -238,6 +255,7 @@ function IncidentsContent() {
                 {/* Search */}
                 <IncidentSearch value={search} onChange={setSearch} />
 
+<<<<<<< HEAD
                 {/* Filters */}
                 <IncidentFilters
                     filters={filters}
@@ -245,6 +263,22 @@ function IncidentsContent() {
                     onClear={handleClearFilters}
                     services={allServices}
                 />
+=======
+            {/* Filters */}
+            <IncidentFilters
+                filters={filters}
+                onChange={handleFilterChange}
+                onClear={handleClearFilters}
+                services={allServices}
+            />
+
+            {/* Results count */}
+            <div className="flex items-center justify-between">
+                <h2 className="text-lg font-semibold text-white">
+                    {standaloneCount} Standalone Incident{standaloneCount !== 1 && "s"} Found
+                </h2>
+            </div>
+>>>>>>> eb2e335 (fix(incidents): fix correlated incidents pagination data flow)
 
             {/* Correlation fetch error */}
             {fetchError && (
@@ -257,19 +291,23 @@ function IncidentsContent() {
             {/* Table or Empty/Loading State */}
             {isLoading ? (
                 <TableSkeleton rows={pageSize} />
-            ) : (incidents.length > 0 || correlatedGroups.length > 0) ? (
+            ) : (allFilteredIncidents.length > 0 || correlatedGroups.length > 0) ? (
                 <>
-                    {correlatedGroups.map(group => (
-                        <CorrelatedIncidentGroup
-                            key={group.groupId}
-                            group={group}
-                            incidents={incidents.filter(i => group.affectedContainers.includes(i.serviceId))}
-                        />
-                    ))}
+                    {correlatedGroups.map(group => {
+                        const groupIncidents = allFilteredIncidents.filter(i => group.affectedContainers.includes(i.serviceId));
+                        if (groupIncidents.length === 0) return null;
+                        return (
+                            <CorrelatedIncidentGroup
+                                key={group.groupId}
+                                group={group}
+                                incidents={groupIncidents}
+                            />
+                        );
+                    })}
 
-                    {standaloneIncidents.length > 0 && (
+                    {paginatedStandaloneIncidents.length > 0 && (
                         <IncidentTable
-                            incidents={standaloneIncidents}
+                            incidents={paginatedStandaloneIncidents}
                             onSort={handleSort}
                             sortConfig={sortConfig}
                         />
@@ -278,7 +316,7 @@ function IncidentsContent() {
                         <Pagination
                             currentPage={page}
                             totalPages={totalPages}
-                            totalCount={totalCount}
+                            totalCount={standaloneCount}
                             pageSize={pageSize}
                             onPageChange={setPage}
                             onPageSizeChange={handlePageSizeChange}
