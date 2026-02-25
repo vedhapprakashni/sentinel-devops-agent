@@ -27,6 +27,11 @@ router.get('/', async (req, res) => {
   const parsedTo = to ? Number(to) : NaN;
   const parsedTimestamp = timestamp ? Number(timestamp) : NaN;
 
+  // Validate time range
+  if (Number.isFinite(parsedFrom) && Number.isFinite(parsedTo) && parsedFrom > parsedTo) {
+    return res.status(400).json({ error: 'Invalid time range: from must be <= to' });
+  }
+
   let startTime = Number.isFinite(parsedFrom) ? parsedFrom : now - 5 * 60 * 1000; // last 5 minutes
   let endTime = Number.isFinite(parsedTo) ? parsedTo : now;
 

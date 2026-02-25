@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter, useParams } from "next/navigation";
 import { DashboardHeader } from "@/components/layout/DashboardHeader";
 import { Incident } from "@/lib/mockData";
 import { TraceTimeline, TraceLike } from "@/components/traces/TraceTimeline";
@@ -27,8 +27,7 @@ interface TraceResponse {
 
 export default function IncidentDetailsPage() {
     const router = useRouter();
-    const searchParams = useSearchParams();
-    const incidentId = searchParams.get("id");
+    const { id: incidentId } = useParams<{ id: string }>();
 
     const [incident, setIncident] = useState<Incident | null>(null);
     const [traceData, setTraceData] = useState<TraceResponse | null>(null);
@@ -60,7 +59,7 @@ export default function IncidentDetailsPage() {
                     return {
                         id: String(insight.id),
                         title: insight.summary || "Incident",
-                        serviceId: "system",
+                        serviceId: insight.serviceId || insight.service || insight.service_name || "system",
                         status: "failed",
                         severity: "warning",
                         timestamp: insight.timestamp || new Date().toISOString(),
@@ -80,7 +79,11 @@ export default function IncidentDetailsPage() {
 
                 setIncident(found);
 
-                const ts = Date.parse(found.timestamp);
+                let ts = Date.parse(found.timestamp);
+                if (Number.isNaN(ts)) {
+                    console.warn("Invalid incident timestamp, falling back to current time");
+                    ts = Date.now();
+                }
                 const traceRes = await fetch(
                     `${apiUrl}/traces?service=${encodeURIComponent(found.serviceId)}&timestamp=${ts}`
                 );

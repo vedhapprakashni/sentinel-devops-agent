@@ -25,25 +25,42 @@ class OpenTelemetryClient {
   /**
    * Query traces by service name and time range.
    * startTime / endTime are expected in epoch milliseconds.
+   *
+   * Unit conversions:
+   *   Jaeger API expects microseconds  → multiply ms by 1,000
+   *   Tempo  API expects seconds       → divide   ms by 1,000
    */
   async queryTraces(serviceName, startTime, endTime) {
     const traces = [];
 
-    // Prefer Jaeger if configured, otherwise try Tempo
+    // Each candidate carries the correctly-converted start/end for its backend.
     const candidates = [
-      this.buildTracesUrl(this.jaegerEndpoint),
-      this.buildTracesUrl(this.tempoEndpoint),
+      this.jaegerEndpoint
+        ? {
+          url: this.buildTracesUrl(this.jaegerEndpoint),
+          start: startTime * 1000,   // ms → µs
+          end: endTime * 1000,
+        }
+        : null,
+      this.tempoEndpoint
+        ? {
+          url: this.buildTracesUrl(this.tempoEndpoint),
+          start: startTime / 1000,   // ms → s
+          end: endTime / 1000,
+        }
+        : null,
     ].filter(Boolean);
 
-    for (const url of candidates) {
+    for (const { url, start, end } of candidates) {
       try {
         const response = await axios.get(url, {
           params: {
             service: serviceName,
-            start: startTime,
-            end: endTime,
+            start,
+            end,
             limit: 50,
           },
+          timeout: 5000,
         });
         if (response.data && Array.isArray(response.data.data)) {
           traces.push(...response.data.data);

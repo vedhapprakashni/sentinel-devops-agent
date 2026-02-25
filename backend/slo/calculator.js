@@ -32,6 +32,32 @@ function calculateErrorBudget(sloDefinition, incidents = []) {
   // Allowed downtime in minutes based on the SLO target
   const allowedDowntimeMinutes = windowMinutes * (1 - targetAvailability / 100);
 
+  // Guard: targetAvailability === 100 means zero budget is allowed
+  if (allowedDowntimeMinutes === 0) {
+    // Compute downtime inline (totalDowntimeMinutes is calculated further below)
+    let zeroTotalDowntime = 0;
+    const windowMs0 = windowMinutes * 60 * 1000;
+    const windowStart0 = Date.now() - windowMs0;
+    const zeroRelevant = incidents.filter(i => (i.resolvedAt || i.createdAt || 0) >= windowStart0);
+    for (const inc of zeroRelevant) {
+      zeroTotalDowntime += (inc.downtimeMinutes || (inc.mttrSeconds || 0) / 60);
+    }
+    return {
+      targetAvailability,
+      currentAvailability: zeroTotalDowntime > 0 ? round(((windowMinutes - zeroTotalDowntime) / windowMinutes) * 100, 3) : 100,
+      trackingWindow,
+      windowMinutes,
+      allowedDowntimeMinutes: 0,
+      usedDowntimeMinutes: round(zeroTotalDowntime, 2),
+      remainingMinutes: 0,
+      budgetPercent: zeroTotalDowntime > 0 ? 0 : 100,
+      burndownRatePerDay: zeroTotalDowntime > 0 ? Infinity : 0,
+      projectedExhaustionDate: zeroTotalDowntime > 0 ? new Date().toISOString() : null,
+      incidentCount: zeroRelevant.length,
+      status: zeroTotalDowntime > 0 ? 'exhausted' : 'healthy',
+    };
+  }
+
   // Calculate current window boundaries
   const now = Date.now();
   const windowMs = windowMinutes * 60 * 1000;
@@ -51,9 +77,7 @@ function calculateErrorBudget(sloDefinition, incidents = []) {
 
   // Calculate remaining budget
   const remainingMinutes = Math.max(0, allowedDowntimeMinutes - totalDowntimeMinutes);
-  const budgetPercent = allowedDowntimeMinutes > 0
-    ? (remainingMinutes / allowedDowntimeMinutes) * 100
-    : 100;
+  const budgetPercent = (remainingMinutes / allowedDowntimeMinutes) * 100;
 
   // Calculate current availability
   const currentAvailability = windowMinutes > 0
@@ -119,7 +143,7 @@ function generateBurndownData(sloDefinition, incidents = [], points = 30) {
   const data = [];
   const interval = windowMs / points;
 
-  for (let i = 0; i <= points; i++) {
+  for (let i = 0; i < points; i++) {
     const timestamp = windowStart + (interval * i);
     let cumulativeDowntime = 0;
 
