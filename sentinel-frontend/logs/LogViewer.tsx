@@ -2,14 +2,12 @@
 
 import { useLogs, LogLevel } from "@/hooks/useLogs";
 import { useNotifications } from "@/hooks/useNotifications";
-// Fix 1: Removed unused ClipboardCheck import
-import { Search, Filter, Trash2, ShieldAlert, CheckCircle, Info, Ban, Activity, Copy } from "lucide-react";
+import { Search, Filter, Trash2, ShieldAlert, CheckCircle, Info, Ban, Activity, Copy, Terminal } from "lucide-react";
 
 export function LogViewer() {
     const { logs, search, setSearch, filterLevel, setFilterLevel, clearLogs, isPaused, setIsPaused } = useLogs();
     const { addNotification } = useNotifications();
 
-    // Fix 2: Added .catch() for clipboard rejection error handling
     const handleCopyLatest = () => {
         if (logs.length === 0) return;
         navigator.clipboard.writeText(logs[0].message).then(() => {
@@ -27,7 +25,6 @@ export function LogViewer() {
         });
     };
 
-    // Fix 3: Context-aware message depending on live/paused state
     const handleClearLogs = () => {
         clearLogs();
         addNotification({
@@ -39,21 +36,35 @@ export function LogViewer() {
         });
     };
 
+    // Fix 1: Debug has its own icon and visual treatment (not falling back to info)
     const getIcon = (level: LogLevel) => {
         switch (level) {
-            case "error": return <Ban className="w-4 h-4 text-red-400" />;
-            case "warn": return <ShieldAlert className="w-4 h-4 text-amber-400" />;
+            case "error":   return <Ban className="w-4 h-4 text-red-400" />;
+            case "warn":    return <ShieldAlert className="w-4 h-4 text-amber-400" />;
             case "success": return <CheckCircle className="w-4 h-4 text-emerald-400" />;
-            default: return <Info className="w-4 h-4 text-blue-400" />;
+            case "debug":   return <Terminal className="w-4 h-4 text-slate-400" />;
+            default:        return <Info className="w-4 h-4 text-blue-400" />;
         }
     };
 
+    // Fix 2: Debug has its own row style and badge color
     const getRowStyle = (level: LogLevel) => {
         switch (level) {
-            case "error": return "bg-red-500/5 hover:bg-red-500/10 border-l-2 border-l-red-500";
-            case "warn": return "bg-amber-500/5 hover:bg-amber-500/10 border-l-2 border-l-amber-500";
+            case "error":   return "bg-red-500/5 hover:bg-red-500/10 border-l-2 border-l-red-500";
+            case "warn":    return "bg-amber-500/5 hover:bg-amber-500/10 border-l-2 border-l-amber-500";
             case "success": return "bg-emerald-500/5 hover:bg-emerald-500/10 border-l-2 border-l-emerald-500";
-            default: return "hover:bg-white/5 border-l-2 border-l-transparent";
+            case "debug":   return "bg-slate-500/5 hover:bg-slate-500/10 border-l-2 border-l-slate-500";
+            default:        return "hover:bg-white/5 border-l-2 border-l-transparent";
+        }
+    };
+
+    const getBadgeColor = (level: LogLevel) => {
+        switch (level) {
+            case "error":   return "text-red-400";
+            case "warn":    return "text-amber-400";
+            case "success": return "text-emerald-400";
+            case "debug":   return "text-slate-400";
+            default:        return "text-blue-400";
         }
     };
 
@@ -63,7 +74,6 @@ export function LogViewer() {
             <div className="flex flex-col md:flex-row gap-4 p-4 bg-[#1e293b]/50 backdrop-blur-xl border border-white/10 rounded-2xl shadow-xl">
                 <div className="relative flex-1 group">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-indigo-400 transition-colors" />
-                    {/* Fix 4: Added aria-label to search input */}
                     <input
                         type="text"
                         placeholder="Search logs by message or service..."
@@ -76,7 +86,6 @@ export function LogViewer() {
 
                 <div className="flex gap-3">
                     <div className="relative">
-                        {/* Fix 5: Added aria-label to select; Fix 6: Added Debug option */}
                         <select
                             value={filterLevel}
                             onChange={(e) => setFilterLevel(e.target.value as LogLevel | "all")}
@@ -93,15 +102,14 @@ export function LogViewer() {
                         <Filter className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
                     </div>
 
-                    {/* Fix 7: Added aria-pressed and aria-label to Live/Paused toggle */}
                     <button
                         onClick={() => setIsPaused(!isPaused)}
                         aria-pressed={isPaused}
                         aria-label={isPaused ? "Resume live log stream" : "Pause live log stream"}
                         className={`px-4 py-2.5 rounded-xl text-sm font-medium border transition-all flex items-center gap-2 ${isPaused
-                                ? 'bg-amber-500/10 text-amber-400 border-amber-500/20 hover:bg-amber-500/20'
-                                : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20 hover:bg-emerald-500/20'
-                            }`}
+                            ? 'bg-amber-500/10 text-amber-400 border-amber-500/20 hover:bg-amber-500/20'
+                            : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20 hover:bg-emerald-500/20'
+                        }`}
                     >
                         <Activity className={`w-4 h-4 ${!isPaused ? 'animate-pulse' : ''}`} />
                         {isPaused ? "Paused" : "Live"}
@@ -110,17 +118,19 @@ export function LogViewer() {
                     <button
                         onClick={handleCopyLatest}
                         disabled={logs.length === 0}
+                        aria-label="Copy latest log entry to clipboard"
                         className="px-4 py-2.5 rounded-xl text-sm font-medium border transition-all flex items-center gap-2 bg-indigo-500/10 text-indigo-400 border-indigo-500/20 hover:bg-indigo-500/20 disabled:opacity-40 disabled:cursor-not-allowed"
-                        title="Copy latest log"
                     >
                         <Copy className="w-4 h-4" />
                         Copy Latest
                     </button>
 
+                    {/* Fix 3: Clear-logs button has aria-label and is disabled when no logs */}
                     <button
                         onClick={handleClearLogs}
-                        className="p-2.5 text-slate-400 hover:text-red-400 hover:bg-red-500/10 border border-transparent hover:border-red-500/10 rounded-xl transition-all"
-                        title="Clear Logs"
+                        disabled={logs.length === 0}
+                        aria-label="Clear all logs"
+                        className="p-2.5 text-slate-400 hover:text-red-400 hover:bg-red-500/10 border border-transparent hover:border-red-500/10 rounded-xl transition-all disabled:opacity-40 disabled:cursor-not-allowed"
                     >
                         <Trash2 className="w-4 h-4" />
                     </button>
@@ -132,7 +142,7 @@ export function LogViewer() {
                 <div className="flex gap-6 px-6 py-4 bg-black/20 border-b border-white/5">
                     <span className="text-xs font-bold text-slate-400 uppercase tracking-widest w-32 shrink-0">Timestamp</span>
                     <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">Event Details</span>
-            </div>
+                </div>
 
                 <div className="divide-y divide-white/5 overflow-y-auto flex-1 custom-scrollbar">
                     {logs.length === 0 ? (
@@ -161,11 +171,7 @@ export function LogViewer() {
                                     <div className="flex items-center gap-3">
                                         <div className="flex items-center gap-2">
                                             {getIcon(log.level)}
-                                            <span className={`text-xs font-bold uppercase tracking-wider ${log.level === 'error' ? 'text-red-400' :
-                                                    log.level === 'warn' ? 'text-amber-400' :
-                                                        log.level === 'success' ? 'text-emerald-400' :
-                                                            'text-blue-400'
-                                                }`}>
+                                            <span className={`text-xs font-bold uppercase tracking-wider ${getBadgeColor(log.level)}`}>
                                                 {log.level}
                                             </span>
                                         </div>
