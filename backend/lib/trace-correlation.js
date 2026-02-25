@@ -6,9 +6,15 @@ const otelClient = require('../integrations/otel');
  */
 function toMillis(startTime) {
   if (!startTime || typeof startTime !== 'number') return null;
-  // Heuristic: microseconds timestamps are usually > 1e13
-  if (startTime > 1e13) {
-    return Math.floor(startTime / 1000);
+  // Normalize based on magnitude:
+  // - nanoseconds:   > 1e15  -> divide by 1e6
+  // - microseconds:  > 1e12  -> divide by 1e3
+  // - milliseconds:  otherwise (returned as-is)
+  if (startTime > 1e15) {
+    return Math.floor(startTime / 1e6);
+  }
+  if (startTime > 1e12) {
+    return Math.floor(startTime / 1e3);
   }
   return startTime;
 }
