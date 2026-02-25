@@ -3,6 +3,7 @@ require('dotenv').config();
 
 const { setupWebSocket } = require('./websocket');
 const express = require('express');
+const { ERRORS } = require('./lib/errors');
 const cors = require('cors');
 const bodyParser = require('body-parser');
 const axios = require('axios');
@@ -77,19 +78,19 @@ async function checkServiceHealth() {
   isChecking = true;
 
   try {
-    console.log('🔍 Checking service health...');
+    console.log('Checking service health...');
     let hasChanges = false;
 
     for (const service of services) {
       let newStatus, newCode;
       try {
         const response = await axios.get(service.url, { timeout: 30000 });
-        console.log(`✅ ${service.name}: ${response.status} - ${response.data.status}`);
+        console.log(`${service.name}: ${response.status} - ${response.data.status}`);
         newStatus = 'healthy';
         newCode = response.status;
       } catch (error) {
         const code = error.response?.status || 503;
-        console.log(`❌ ${service.name}: ERROR - ${error.code || error.message}`);
+        console.log(`${service.name}: ERROR - ${error.code || error.message}`);
         newStatus = code >= 500 ? 'critical' : 'degraded';
         newCode = code;
       }
@@ -203,7 +204,7 @@ app.post('/api/action/:service/:type', async (req, res) => {
 
   if (!port) {
     logActivity('warn', `Failed action '${type}': Invalid service '${service}'`);
-    return res.status(400).json({ success: false, error: 'Invalid service' });
+    return res.status(400).json(ERRORS.SERVICE_NOT_FOUND(service).toJSON());
   }
 
   try {
@@ -220,7 +221,7 @@ app.post('/api/action/:service/:type', async (req, res) => {
     res.json({ success: true, message: `${type} executed on ${service}` });
   } catch (error) {
     logActivity('error', `Action '${type}' on ${service} failed: ${error.message}`);
-    res.status(500).json({ success: false, error: error.message });
+    res.status(500).json(ERRORS.ACTION_FAILED(error.message).toJSON());
   }
 });
 
@@ -235,7 +236,7 @@ const requireDockerAuth = (req, res, next) => {
 
 const validateId = (req, res, next) => {
   if (!req.params.id || typeof req.params.id !== 'string' || req.params.id.length < 1) {
-    return res.status(400).json({ error: 'Invalid ID provided' });
+    return res.status(400).json(ERRORS.INVALID_ID().toJSON());
   }
   next();
 };
@@ -243,7 +244,7 @@ const validateId = (req, res, next) => {
 const validateScaleParams = (req, res, next) => {
   const replicas = parseInt(req.params.replicas, 10);
   if (!req.params.service || isNaN(replicas) || replicas < 0 || replicas > 100) {
-    return res.status(400).json({ error: 'Invalid scale parameters' });
+    return res.status(400).json(ERRORS.INVALID_SCALE_PARAMS().toJSON());
   }
   next();
 };
@@ -267,7 +268,7 @@ app.get('/api/docker/containers', async (req, res) => {
 
     res.json({ containers: enrichedContainers });
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    res.status(500).json(ERRORS.DOCKER_CONNECTION().toJSON());
   }
 });
 
@@ -276,13 +277,13 @@ app.get('/api/docker/health/:id', validateId, async (req, res) => {
     const health = await getContainerHealth(req.params.id);
     res.json(health);
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    res.status(500).json(ERRORS.DOCKER_CONNECTION().toJSON());
   }
 });
 
 app.get('/api/docker/metrics/:id', validateId, (req, res) => {
   const metrics = monitor.getMetrics(req.params.id);
-  res.json(metrics || { error: 'No metrics available' });
+  res.json(metrics || ERRORS.NO_DATA().toJSON());
 });
 
 app.post('/api/docker/try-restart/:id', requireDockerAuth, validateId, async (req, res) => {
@@ -296,11 +297,7 @@ app.post('/api/docker/try-restart/:id', requireDockerAuth, validateId, async (re
   }
 
   if (tracker.attempts >= MAX_RESTARTS) {
-    return res.status(429).json({
-      allowed: false,
-      reason: 'Max restart attempts exceeded',
-      nextRetry: new Date(tracker.lastAttempt + GRACE_PERIOD_MS)
-    });
+    return res.status(429).json(ERRORS.MAX_RESTARTS_EXCEEDED().toJSON());
   }
 
   tracker.attempts++;
@@ -336,7 +333,7 @@ app.post('/api/docker/scale/:service/:replicas', requireDockerAuth, validateScal
 });
 
 const server = app.listen(PORT, '0.0.0.0', () => {
-  console.log(`🚀 Sentinel Backend running on http://0.0.0.0:${PORT}`);
+  console.log(`Sentinel Backend running on http://0.0.0.0:${PORT}`);
 });
 
 // Setup WebSocket
