@@ -8,11 +8,11 @@ const { ERRORS } = errorsModule;
 
 const printError = (err) => {
     if (err && err.name === 'SentinelError') {
-        console.log('\n' + chalk.bold('Message: ') + err.message);
-        console.log(chalk.bold('Reason: ') + err.reason);
-        console.log(chalk.bold('Solution: ') + err.solution + '\n');
+        console.error('\n' + chalk.bold('Message: ') + err.message);
+        console.error(chalk.bold('Reason: ') + err.reason);
+        console.error(chalk.bold('Solution: ') + err.solution + '\n');
     } else {
-        console.log('\n' + chalk.bold('Message: ') + (err?.message || 'Unknown error occurred.') + '\n');
+        console.error('\n' + chalk.bold('Message: ') + (err?.message || 'Unknown error occurred.') + '\n');
     }
 };
 

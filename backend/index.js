@@ -220,8 +220,9 @@ app.post('/api/action/:service/:type', async (req, res) => {
     logActivity('success', `Successfully executed '${type}' on ${service}`);
     res.json({ success: true, message: `${type} executed on ${service}` });
   } catch (error) {
-    logActivity('error', `Action '${type}' on ${service} failed: ${error.message}`);
-    res.status(500).json(ERRORS.ACTION_FAILED(error.message).toJSON());
+    console.error(error);
+    logActivity('error', `Action '${type}' on ${service} failed.`);
+    res.status(500).json(ERRORS.ACTION_FAILED().toJSON());
   }
 });
 
@@ -268,6 +269,7 @@ app.get('/api/docker/containers', async (req, res) => {
 
     res.json({ containers: enrichedContainers });
   } catch (error) {
+    console.error(error);
     res.status(500).json(ERRORS.DOCKER_CONNECTION().toJSON());
   }
 });
@@ -277,6 +279,7 @@ app.get('/api/docker/health/:id', validateId, async (req, res) => {
     const health = await getContainerHealth(req.params.id);
     res.json(health);
   } catch (error) {
+    console.error(error);
     res.status(500).json(ERRORS.DOCKER_CONNECTION().toJSON());
   }
 });
@@ -304,8 +307,13 @@ app.post('/api/docker/try-restart/:id', requireDockerAuth, validateId, async (re
   tracker.lastAttempt = now;
   restartTracker.set(id, tracker);
 
-  const result = await healer.restartContainer(id);
-  res.json({ allowed: true, ...result });
+  try {
+    const result = await healer.restartContainer(id);
+    res.json({ allowed: true, ...result });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json(ERRORS.ACTION_FAILED().toJSON());
+  }
 });
 
 app.post('/api/docker/restart/:id', requireDockerAuth, validateId, async (req, res) => {
@@ -318,18 +326,33 @@ app.post('/api/docker/restart/:id', requireDockerAuth, validateId, async (req, r
   tracker.lastAttempt = now;
   restartTracker.set(id, tracker);
 
-  const result = await healer.restartContainer(id);
-  res.json(result);
+  try {
+    const result = await healer.restartContainer(id);
+    res.json(result);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json(ERRORS.ACTION_FAILED().toJSON());
+  }
 });
 
 app.post('/api/docker/recreate/:id', requireDockerAuth, validateId, async (req, res) => {
-  const result = await healer.recreateContainer(req.params.id);
-  res.json(result);
+  try {
+    const result = await healer.recreateContainer(req.params.id);
+    res.json(result);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json(ERRORS.ACTION_FAILED().toJSON());
+  }
 });
 
 app.post('/api/docker/scale/:service/:replicas', requireDockerAuth, validateScaleParams, async (req, res) => {
-  const result = await healer.scaleService(req.params.service, req.params.replicas);
-  res.json(result);
+  try {
+    const result = await healer.scaleService(req.params.service, req.params.replicas);
+    res.json(result);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json(ERRORS.ACTION_FAILED().toJSON());
+  }
 });
 
 const server = app.listen(PORT, '0.0.0.0', () => {

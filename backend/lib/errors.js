@@ -78,6 +78,24 @@ const ERRORS = {
         'Maximum restart attempts exceeded.',
         'The container has been restarted too many times within the grace period.',
         'Investigate the root cause of the container failure before attempting manual restarts.'
+    ),
+    INVALID_ID: () => new SentinelError(
+        'INVALID_ID',
+        'Invalid container ID provided.',
+        'The provided container ID is missing, empty, or incorrectly formatted.',
+        'Ensure you pass a valid, non-empty string for the container ID.'
+    ),
+    INVALID_SCALE_PARAMS: () => new SentinelError(
+        'INVALID_SCALE_PARAMS',
+        'Invalid parameters provided for scaling.',
+        'The provided replica count is not a number, less than 0, or exceeds the maximum limit of 100, or the service name is missing.',
+        'Ensure the replicas parameter is an integer between 0 and 100 and the service name is provided.'
+    ),
+    NO_DATA: () => new SentinelError(
+        'NO_DATA',
+        'No data available.',
+        'The requested metrics or health data is currently unavailable.',
+        'Wait a moment and try the request again, ensuring the service is running and monitored.'
     )
 };
 
