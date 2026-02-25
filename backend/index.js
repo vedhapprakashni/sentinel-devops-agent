@@ -44,6 +44,9 @@ let activityLog = [];
 let aiLogs = [];
 let nextLogId = 1;
 
+// Expose aiLogs to route handlers (used by /api/incidents/correlated)
+app.locals.aiLogs = aiLogs;
+
 function logActivity(type, message) {
   const entry = {
     id: nextLogId++,

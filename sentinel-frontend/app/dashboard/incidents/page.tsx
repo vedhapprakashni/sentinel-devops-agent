@@ -187,7 +187,12 @@ function IncidentsContent() {
                             <AlertCircle className="h-4 w-4" />
                             <span className="text-xs uppercase tracking-wider font-semibold">Total</span>
                         </div>
-                        <div className="text-2xl font-bold text-white">{totalCount}</div>
+                        <div className="text-2xl font-bold text-white">{totalCount + correlatedGroups.reduce((sum, g) => sum + (g.incidents?.length || 0), 0)}</div>
+                        {correlatedGroups.length > 0 && (
+                            <p className="text-xs text-muted-foreground mt-1">
+                                {correlatedGroups.reduce((sum, g) => sum + (g.incidents?.length || 0), 0)} grouped · {standaloneCount} standalone
+                            </p>
+                        )}
                     </div>
                     <div className="p-3 sm:p-4 bg-white/5 border border-white/5 rounded-xl">
                         <div className="flex items-center gap-2 text-muted-foreground mb-1">
@@ -275,7 +280,7 @@ function IncidentsContent() {
                 ) : (allFilteredIncidents.length > 0 || correlatedGroups.length > 0) ? (
                     <>
                         {correlatedGroups.map(group => {
-                            const groupIncidents = allFilteredIncidents.filter(i => group.affectedContainers.includes(i.serviceId));
+                            const groupIncidents = group.incidents || [];
                             if (groupIncidents.length === 0) return null;
                             return (
                                 <CorrelatedIncidentGroup

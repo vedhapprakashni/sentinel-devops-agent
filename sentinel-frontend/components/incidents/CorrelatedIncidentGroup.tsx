@@ -13,6 +13,7 @@ export interface CorrelatedGroupData {
     blastRadius: number;
     correlationSignals?: string[];
     suppressedAlerts: number;
+    incidents?: Incident[];
 }
 
 interface CorrelatedIncidentGroupProps {

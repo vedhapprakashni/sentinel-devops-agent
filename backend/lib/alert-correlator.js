@@ -64,6 +64,14 @@ class AlertCorrelator {
                     blastRadius: affectedContainers.length + (2 * isSharedDependency),
                     correlationSignals,
                     suppressedAlerts: alerts.length - 1,
+                    // Expose per-group alert details so the API can
+                    // build complete incident payloads for the frontend
+                    alerts: sorted.map(a => ({
+                        containerId: a.containerId,
+                        ts: a.ts,
+                        type: a.type || 'container_failure',
+                        labels: a.labels || {},
+                    })),
                 };
             });
     }
