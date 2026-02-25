@@ -52,13 +52,13 @@ function IncidentsContent() {
     const [page, setPage] = useState(Number(searchParams.get("page")) || 1);
     const [pageSize, setPageSize] = useState(Number(searchParams.get("pageSize")) || 10);
 
-    const { incidents, isLoading, totalCount, totalActive, totalCritical, allServices } = useIncidentHistory({
-            filters,
-            search,
-            sort: sortConfig,
-            page,
-            pageSize,
-        });
+    const { incidents, allFilteredIncidents, isLoading, totalCount, totalActive, totalCritical, allServices } = useIncidentHistory({
+        filters,
+        search,
+        sort: sortConfig,
+        page,
+        pageSize,
+    });
 
     // Sync URL with state
     useEffect(() => {
@@ -154,7 +154,7 @@ function IncidentsContent() {
                         </div>
                         <div className="text-2xl font-bold text-white truncate">
                             {(() => {
-                                const resolvedIncidents = incidents.filter(
+                                const resolvedIncidents = allFilteredIncidents.filter(
                                     (i) => i.status === "resolved" && i.duration !== "N/A"
                                 );
                                 if (resolvedIncidents.length === 0) return "—";
