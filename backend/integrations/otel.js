@@ -35,29 +35,18 @@ class OpenTelemetryClient {
 
     // Each candidate carries the correctly-converted start/end for its backend.
     const candidates = [
-      this.jaegerEndpoint
-        ? {
-          url: this.buildTracesUrl(this.jaegerEndpoint),
-          start: startTime * 1000,   // ms → µs
-          end: endTime * 1000,
-        }
-        : null,
-      this.tempoEndpoint
-        ? {
-          url: this.buildTracesUrl(this.tempoEndpoint),
-          start: startTime / 1000,   // ms → s
-          end: endTime / 1000,
-        }
-        : null,
-    ].filter(Boolean);
+      { url: this.jaegerEndpoint, multiplier: 1000 },    // ms → µs
+      { url: this.tempoEndpoint, multiplier: 0.001 }     // ms → s
+    ];
 
-    for (const { url, start, end } of candidates) {
+    for (const { url, multiplier } of candidates) {
+      if (!url) continue;
       try {
-        const response = await axios.get(url, {
+        const response = await axios.get(this.buildTracesUrl(url), {
           params: {
             service: serviceName,
-            start,
-            end,
+            start: Math.floor(startTime * multiplier),
+            end: Math.floor(endTime * multiplier),
             limit: 50,
           },
           timeout: 5000,

@@ -28,11 +28,9 @@ function attachServiceNames(trace) {
   const processes = trace.processes;
   trace.spans = trace.spans.map((span) => {
     const processMeta = processes[span.processID];
-    return {
-      ...span,
-      // Add serviceName as a new field; leave processID (string key) intact
-      serviceName: processMeta?.serviceName ?? null,
-    };
+    return processMeta?.serviceName
+      ? { ...span, serviceName: processMeta.serviceName }  // New field
+      : { ...span };
   });
 
   return trace;

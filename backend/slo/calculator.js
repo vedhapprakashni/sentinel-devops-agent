@@ -77,7 +77,9 @@ function calculateErrorBudget(sloDefinition, incidents = []) {
 
   // Calculate remaining budget
   const remainingMinutes = Math.max(0, allowedDowntimeMinutes - totalDowntimeMinutes);
-  const budgetPercent = (remainingMinutes / allowedDowntimeMinutes) * 100;
+  const budgetPercent = allowedDowntimeMinutes > 0
+    ? ((allowedDowntimeMinutes - totalDowntimeMinutes) / allowedDowntimeMinutes) * 100
+    : (totalDowntimeMinutes > 0 ? 0 : 100);
 
   // Calculate current availability
   const currentAvailability = windowMinutes > 0
@@ -157,7 +159,7 @@ function generateBurndownData(sloDefinition, incidents = [], points = 30) {
     const remaining = Math.max(0, allowedDowntimeMinutes - cumulativeDowntime);
     const budgetPct = allowedDowntimeMinutes > 0
       ? (remaining / allowedDowntimeMinutes) * 100
-      : 100;
+      : (cumulativeDowntime > 0 ? 0 : 100);
 
     data.push({
       timestamp: new Date(timestamp).toISOString(),

@@ -79,14 +79,12 @@ export default function IncidentDetailsPage() {
 
                 setIncident(found);
 
-                let ts = Date.parse(found.timestamp);
-                if (Number.isNaN(ts)) {
-                    console.warn("Invalid incident timestamp, falling back to current time");
-                    ts = Date.now();
+                let url = `${apiUrl}/traces?service=${encodeURIComponent(found.serviceId)}`;
+                const ts = Date.parse(found.timestamp);
+                if (!Number.isNaN(ts)) {
+                    url += `&timestamp=${ts}`;
                 }
-                const traceRes = await fetch(
-                    `${apiUrl}/traces?service=${encodeURIComponent(found.serviceId)}&timestamp=${ts}`
-                );
+                const traceRes = await fetch(url);
 
                 if (traceRes.ok) {
                     const traceJson: TraceResponse = await traceRes.json();
