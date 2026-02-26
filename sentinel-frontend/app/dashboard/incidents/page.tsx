@@ -1,7 +1,6 @@
 "use client";
 
-import { DashboardHeader } from "@/components/layout/DashboardHeader";
-import { IncidentCard } from "@/components/dashboard/IncidentCard";
+
 import { Suspense, useState, useCallback, useEffect } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { Activity, Clock, AlertCircle, FileWarning } from "lucide-react";
@@ -12,6 +11,7 @@ import { IncidentExport } from "@/components/incidents/IncidentExport";
 import { TableSkeleton } from "@/components/incidents/TableSkeleton";
 import { Pagination } from "@/components/common/Pagination";
 import { useIncidentHistory, FilterState, SortConfig } from "@/hooks/useIncidentHistory";
+import { Button } from "@/components/common/Button";
 
 const defaultFilters: FilterState = {
     services: [],
@@ -52,7 +52,7 @@ function IncidentsContent() {
     const [page, setPage] = useState(Number(searchParams.get("page")) || 1);
     const [pageSize, setPageSize] = useState(Number(searchParams.get("pageSize")) || 10);
 
-    const { incidents, isLoading, totalCount, totalActive, totalCritical, allServices } = useIncidentHistory({
+    const { incidents, allFilteredIncidents, isLoading, totalCount, totalActive, totalCritical, allServices } = useIncidentHistory({
         filters,
         search,
         sort: sortConfig,
@@ -111,150 +111,156 @@ function IncidentsContent() {
     const totalPages = Math.ceil(totalCount / pageSize);
 
     return (
-        <div className="container mx-auto max-w-7xl pb-20 space-y-6">
-            {/* Header */}
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                <div>
-                    <h1 className="text-3xl font-bold tracking-tight text-white">Incident History</h1>
-                    <p className="text-muted-foreground">
-                        Comprehensive log of all system incidents and agent remediations.
-                    </p>
+        <div className="w-full max-w-full overflow-x-hidden">
+            <div className="container mx-auto max-w-7xl px-2 sm:px-4 lg:px-6 pb-20 space-y-4 sm:space-y-6">
+                {/* Header */}
+                <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 px-2 sm:px-0">
+                    <div>
+                        <h1 className="text-3xl font-bold tracking-tight text-white">Incident History</h1>
+                        <p className="text-muted-foreground">
+                            Comprehensive log of all system incidents and agent remediations.
+                        </p>
+                    </div>
+                    <div className="flex items-center gap-3">
+                        <Button
+                            variant="default"
+                            shortcutHint="N"
+                            onClick={() => router.push('/dashboard/incidents/new')}
+                            className="bg-primary hover:bg-primary/90 hidden sm:flex"
+                        >
+                            New Incident
+                        </Button>
+                        <IncidentExport incidents={incidents} disabled={isLoading} />
+                    </div>
                 </div>
-                <IncidentExport incidents={incidents} disabled={isLoading} />
+
+                {/* Stats Cards */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
+                    <div className="p-3 sm:p-4 bg-white/5 border border-white/5 rounded-xl">
+                        <div className="flex items-center gap-2 text-muted-foreground mb-1">
+                            <AlertCircle className="h-4 w-4" />
+                            <span className="text-xs uppercase tracking-wider font-semibold">Total</span>
+                        </div>
+                        <div className="text-2xl font-bold text-white">{totalCount}</div>
+                    </div>
+                    <div className="p-3 sm:p-4 bg-white/5 border border-white/5 rounded-xl">
+                        <div className="flex items-center gap-2 text-muted-foreground mb-1">
+                            <Activity className="h-4 w-4" />
+                            <span className="text-xs uppercase tracking-wider font-semibold">Active</span>
+                        </div>
+                        <div className="text-2xl font-bold text-yellow-400">{totalActive}</div>
+                    </div>
+                    <div className="p-3 sm:p-4 bg-white/5 border border-white/5 rounded-xl">
+                        <div className="flex items-center gap-2 text-muted-foreground mb-1">
+                            <FileWarning className="h-4 w-4" />
+                            <span className="text-xs uppercase tracking-wider font-semibold">Critical</span>
+                        </div>
+                        <div className="text-2xl font-bold text-red-400">{totalCritical}</div>
+                    </div>
+                    <div className="p-3 sm:p-4 bg-white/5 border border-white/5 rounded-xl overflow-hidden">
+                        <div className="flex items-center gap-2 text-muted-foreground mb-1">
+                            <Clock className="h-4 w-4 shrink-0" />
+                            <span className="text-xs uppercase tracking-wider font-semibold">MTTR</span>
+                        </div>
+                        <div className="text-2xl font-bold text-white truncate">
+                            {(() => {
+                                const resolvedIncidents = allFilteredIncidents.filter(
+                                    (i) => i.status === "resolved" && i.duration !== "N/A"
+                                );
+                                if (resolvedIncidents.length === 0) return "—";
+
+                                let totalSeconds = 0;
+                                let count = 0;
+
+                                resolvedIncidents.forEach((inc) => {
+                                    const mMatch = inc.duration.match(/(\d+)m/);
+                                    const sMatch = inc.duration.match(/(\d+)s/);
+                                    let seconds = 0;
+                                    if (mMatch) seconds += parseInt(mMatch[1]) * 60;
+                                    if (sMatch) seconds += parseInt(sMatch[1]);
+
+                                    if (seconds > 0) {
+                                        totalSeconds += seconds;
+                                        count++;
+                                    }
+                                });
+
+                                if (count === 0) return "—";
+                                const avgSeconds = Math.round(totalSeconds / count);
+                                const avgM = Math.floor(avgSeconds / 60);
+                                const avgS = avgSeconds % 60;
+
+                                if (avgM > 0) return `${avgM}m ${avgS}s`;
+                                return `${avgS}s`;
+                            })()}
+                        </div>
+                    </div>
+                </div>
+
+                {/* Search */}
+                <IncidentSearch value={search} onChange={setSearch} />
+
+                {/* Filters */}
+                <IncidentFilters
+                    filters={filters}
+                    onChange={handleFilterChange}
+                    onClear={handleClearFilters}
+                    services={allServices}
+                />
+
+                {/* Results count */}
+                <div className="flex items-center justify-between">
+                    <h2 className="text-lg font-semibold text-white">
+                        {totalCount} Incident{totalCount !== 1 && "s"} Found
+                    </h2>
+                </div>
+
+                {/* Table or Empty/Loading State */}
+                {isLoading ? (
+                    <TableSkeleton rows={pageSize} />
+                ) : incidents.length > 0 ? (
+                    <>
+                        <IncidentTable incidents={incidents} onSort={handleSort} sortConfig={sortConfig} />
+                        {totalPages > 1 && (
+                            <Pagination
+                                currentPage={page}
+                                totalPages={totalPages}
+                                totalCount={totalCount}
+                                pageSize={pageSize}
+                                onPageChange={setPage}
+                                onPageSizeChange={handlePageSizeChange}
+                            />
+                        )}
+                    </>
+                ) : (
+                    <div className="text-center py-20 bg-white/5 border border-white/10 rounded-xl border-dashed">
+                        <FileWarning className="h-12 w-12 mx-auto text-muted-foreground/50 mb-4" />
+                        <p className="text-muted-foreground mb-2">No incidents found matching your criteria.</p>
+                        <button
+                            onClick={handleClearFilters}
+                            className="text-primary text-sm hover:underline"
+                        >
+                            Clear all filters
+                        </button>
+                    </div>
+                )}
             </div>
-
-            {/* Stats Cards */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <div className="p-4 bg-white/5 border border-white/5 rounded-xl">
-                    <div className="flex items-center gap-2 text-muted-foreground mb-1">
-                        <AlertCircle className="h-4 w-4" />
-                        <span className="text-xs uppercase tracking-wider font-semibold">Total</span>
-                    </div>
-                    <div className="text-2xl font-bold text-white">{totalCount}</div>
-                </div>
-                <div className="p-4 bg-white/5 border border-white/5 rounded-xl">
-                    <div className="flex items-center gap-2 text-muted-foreground mb-1">
-                        <Activity className="h-4 w-4" />
-                        <span className="text-xs uppercase tracking-wider font-semibold">Active</span>
-                    </div>
-                    <div className="text-2xl font-bold text-yellow-400">{totalActive}</div>
-                </div>
-                <div className="p-4 bg-white/5 border border-white/5 rounded-xl">
-                    <div className="flex items-center gap-2 text-muted-foreground mb-1">
-                        <FileWarning className="h-4 w-4" />
-                        <span className="text-xs uppercase tracking-wider font-semibold">Critical</span>
-                    </div>
-                    <div className="text-2xl font-bold text-red-400">{totalCritical}</div>
-                </div>
-                <div className="p-4 bg-white/5 border border-white/5 rounded-xl">
-                    <div className="flex items-center gap-2 text-muted-foreground mb-1">
-                        <Clock className="h-4 w-4" />
-                        <span className="text-xs uppercase tracking-wider font-semibold">MTTR</span>
-                    </div>
-                    <div className="text-2xl font-bold text-white">
-                        {(() => {
-                            const resolvedIncidents = incidents.filter(i => i.status === 'resolved' && i.duration !== 'N/A');
-                            if (resolvedIncidents.length === 0) return "—";
-
-                            // Parse duration if possible, or just use a placeholder logic
-                            // Since duration is string "5m 20s", "15m", "Ongoing", parsing is complex without a helper.
-                            // For this task, let's look for minutes in the string or just return a static average if complex parsing isn't desired.
-                            // But the requirement says "compute MTTR".
-                            // Let's implement a simple parser for "Nm Ns" format.
-
-                            let totalSeconds = 0;
-                            let count = 0;
-
-                            resolvedIncidents.forEach(inc => {
-                                const mMatch = inc.duration.match(/(\d+)m/);
-                                const sMatch = inc.duration.match(/(\d+)s/);
-                                let seconds = 0;
-                                if (mMatch) seconds += parseInt(mMatch[1]) * 60;
-                                if (sMatch) seconds += parseInt(sMatch[1]);
-
-                                if (seconds > 0) {
-                                    totalSeconds += seconds;
-                                    count++;
-                                }
-                            });
-
-                            if (count === 0) return "—";
-                            const avgSeconds = Math.round(totalSeconds / count);
-                            const avgM = Math.floor(avgSeconds / 60);
-                            const avgS = avgSeconds % 60;
-
-                            if (avgM > 0) return `${avgM}m ${avgS}s`;
-                            return `${avgS}s`;
-                        })()}
-                    </div>
-                </div>
-            </div>
-
-            {/* Search */}
-            <IncidentSearch value={search} onChange={setSearch} />
-
-            {/* Filters */}
-            <IncidentFilters
-                filters={filters}
-                onChange={handleFilterChange}
-                onClear={handleClearFilters}
-                services={allServices}
-            />
-
-            {/* Results count */}
-            <div className="flex items-center justify-between">
-                <h2 className="text-lg font-semibold text-white">
-                    {totalCount} Incident{totalCount !== 1 && "s"} Found
-                </h2>
-            </div>
-
-            {/* Table or Empty/Loading State */}
-            {isLoading ? (
-                <TableSkeleton rows={pageSize} />
-            ) : incidents.length > 0 ? (
-                <>
-                    <IncidentTable
-                        incidents={incidents}
-                        onSort={handleSort}
-                        sortConfig={sortConfig}
-                    />
-                    {totalPages > 1 && (
-                        <Pagination
-                            currentPage={page}
-                            totalPages={totalPages}
-                            totalCount={totalCount}
-                            pageSize={pageSize}
-                            onPageChange={setPage}
-                            onPageSizeChange={handlePageSizeChange}
-                        />
-                    )}
-                </>
-            ) : (
-                <div className="text-center py-20 bg-white/5 border border-white/10 rounded-xl border-dashed">
-                    <FileWarning className="h-12 w-12 mx-auto text-muted-foreground/50 mb-4" />
-                    <p className="text-muted-foreground mb-2">No incidents found matching your criteria.</p>
-                    <button
-                        onClick={handleClearFilters}
-                        className="text-primary text-sm hover:underline"
-                    >
-                        Clear all filters
-                    </button>
-                </div>
-            )}
         </div>
     );
 }
 
 function IncidentsLoadingFallback() {
     return (
-        <div className="container mx-auto max-w-7xl pb-20 space-y-6">
-            <div>
-                <h1 className="text-3xl font-bold tracking-tight text-white">Incident History</h1>
-                <p className="text-muted-foreground">
-                    Comprehensive log of all system incidents and agent remediations.
-                </p>
+        <div className="w-full max-w-full overflow-x-hidden">
+            <div className="container mx-auto max-w-7xl px-2 sm:px-4 lg:px-6 pb-20 space-y-4 sm:space-y-6">
+                <div className="px-2 sm:px-0">
+                    <h1 className="text-3xl font-bold tracking-tight text-white">Incident History</h1>
+                    <p className="text-muted-foreground">
+                        Comprehensive log of all system incidents and agent remediations.
+                    </p>
+                </div>
+                <TableSkeleton rows={10} />
             </div>
-            <TableSkeleton rows={10} />
         </div>
     );
 }
