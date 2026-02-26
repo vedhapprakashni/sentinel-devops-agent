@@ -118,6 +118,25 @@ export const mockServices: Service[] = [
 export const mockIncidents: Incident[] = [
 
 {
+    id: "inc-network-recovered",
+    title: "Gateway Network Instability (Recovered)",
+    serviceId: "api-gateway",
+    status: "resolved",
+    severity: "warning",
+    timestamp: new Date(Date.now() - 1000 * 60 * 120).toISOString(),
+    duration: "1h 30m",
+    rootCause: "Intermittent packet loss between edge and gateway",
+    agentAction: "Rerouted traffic and reset flaky node",
+    agentPredictionConfidence: 94,
+    timeline: [
+        { time: "11:00:00", event: "Packet loss spike detected", icon: "📡" },
+        { time: "11:25:00", event: "Retries increasing", icon: "⚠️" },
+        { time: "11:50:00", event: "Traffic rerouted", icon: "🤖" },
+        { time: "12:30:00", event: "Network stabilized", icon: "✅" },
+    ]
+},
+
+{
     id: "inc-cascade",
     title: "Payment API Cascade Failure",
     serviceId: "payment-service",
