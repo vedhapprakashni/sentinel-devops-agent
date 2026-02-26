@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { RunbookTrigger, RunbookAction } from '../../lib/runbook-types';
+import { RunbookTrigger, RunbookAction } from '@/lib/runbook-types';
 
 interface RuleEditorProps {
     item: RunbookTrigger | RunbookAction;
