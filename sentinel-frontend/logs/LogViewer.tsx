@@ -10,11 +10,12 @@ export function LogViewer() {
 
     const handleCopyLatest = () => {
         if (logs.length === 0) return;
-        if (!navigator.clipboard) {
+        // Fix 1: Full clipboard API guard before calling writeText
+        if (typeof navigator === 'undefined' || !navigator.clipboard || !navigator.clipboard.writeText) {
             addNotification({
                 type: "error",
                 title: "Copy failed",
-                message: "Clipboard API is not available in this context.",
+                message: "Clipboard API not available. Use HTTPS or a modern browser.",
             });
             return;
         }
@@ -131,10 +132,12 @@ export function LogViewer() {
                         Copy Latest
                     </button>
 
+                    {/* Fix 2: aria-label added, Fix 3: disabled when no logs */}
                     <button
                         onClick={handleClearLogs}
                         disabled={logs.length === 0}
-                        aria-label="Clear all logs"
+                        aria-label="Clear logs"
+                        title="Clear Logs"
                         className="p-2.5 text-slate-400 hover:text-red-400 hover:bg-red-500/10 border border-transparent hover:border-red-500/10 rounded-xl transition-all disabled:opacity-40 disabled:cursor-not-allowed"
                     >
                         <Trash2 className="w-4 h-4" />

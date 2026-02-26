@@ -13,7 +13,6 @@ interface IncidentDetailProps {
 export function IncidentDetail({ incident, onViewReasoning }: IncidentDetailProps) {
     const { addNotification } = useNotifications();
 
-    // Fix 1: Guard so notification only fires when callback actually exists
     const handleViewReasoning = () => {
         if (!onViewReasoning) return;
         onViewReasoning(incident.id);
@@ -89,11 +88,12 @@ export function IncidentDetail({ incident, onViewReasoning }: IncidentDetailProp
                 </div>
             )}
 
-            {/* Actions */}
+            {/* Actions - Fix 5: disabled when onViewReasoning is not provided */}
             <div className="flex justify-end pt-2">
                 <Button
                     size="sm"
                     variant="outline"
+                    disabled={!onViewReasoning}
                     onClick={handleViewReasoning}
                 >
                     <Search className="h-3 w-3 mr-2" />
