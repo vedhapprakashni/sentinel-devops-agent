@@ -1,6 +1,6 @@
 import { Handle, Position } from '@xyflow/react';
 import { Play } from 'lucide-react';
-import { RunbookAction } from '../../lib/runbook-types';
+import { RunbookAction } from '@/lib/runbook-types';
 
 const ACTION_LABELS: Record<string, string> = {
     restart_container: 'Restart Container',
