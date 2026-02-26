@@ -10,6 +10,7 @@ class SentinelError extends Error {
     toJSON() {
         return {
             error: {
+                code: this.code,
                 message: this.message,
                 reason: this.reason,
                 solution: this.solution

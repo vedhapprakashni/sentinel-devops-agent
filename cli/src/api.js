@@ -9,7 +9,7 @@ const handleApiError = (error, fallbackErrorFactory) => {
     const beErr = error.response?.data?.error;
     if (beErr && beErr.message) {
         throw new SentinelError(
-            'API_ERROR',
+            beErr.code || 'ACTION_FAILED',
             beErr.message,
             beErr.reason || 'An error was returned by the backend.',
             beErr.solution || 'Resolve the backend issue and try again.'

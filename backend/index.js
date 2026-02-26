@@ -243,8 +243,9 @@ const validateId = (req, res, next) => {
 };
 
 const validateScaleParams = (req, res, next) => {
-  const replicas = parseInt(req.params.replicas, 10);
-  if (!req.params.service || isNaN(replicas) || replicas < 0 || replicas > 100) {
+  const replicasRaw = req.params.replicas;
+  const replicas = Number(replicasRaw);
+  if (!req.params.service || !/^\d+$/.test(replicasRaw) || !Number.isInteger(replicas) || replicas < 0 || replicas > 100) {
     return res.status(400).json(ERRORS.INVALID_SCALE_PARAMS().toJSON());
   }
   next();
@@ -286,7 +287,10 @@ app.get('/api/docker/health/:id', validateId, async (req, res) => {
 
 app.get('/api/docker/metrics/:id', validateId, (req, res) => {
   const metrics = monitor.getMetrics(req.params.id);
-  res.json(metrics || ERRORS.NO_DATA().toJSON());
+  if (!metrics) {
+    return res.status(404).json(ERRORS.NO_DATA().toJSON());
+  }
+  res.json(metrics);
 });
 
 app.post('/api/docker/try-restart/:id', requireDockerAuth, validateId, async (req, res) => {
