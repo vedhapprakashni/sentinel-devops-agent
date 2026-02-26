@@ -14,9 +14,13 @@ const healer = require('./docker/healer');
 const authRoutes = require('./routes/auth.routes');
 const usersRoutes = require('./routes/users.routes');
 const rolesRoutes = require('./routes/roles.routes');
+const { apiLimiter } = require('./middleware/rateLimiter');
 
 // SLO Routes
 const sloRoutes = require('./routes/slo.routes');
+
+// Distributed Traces Routes
+const traceRoutes = require('./routes/traces.routes');
 
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -25,6 +29,9 @@ const PORT = process.env.PORT || 4000;
 app.use(cors());
 app.use(bodyParser.json());
 
+// Rate limiters (ADD HERE)
+app.use('/api', apiLimiter);
+
 // RBAC Routes
 app.use('/auth', authRoutes);
 app.use('/api/users', usersRoutes);
@@ -32,6 +39,9 @@ app.use('/api/roles', rolesRoutes);
 
 // SLO Routes
 app.use('/api/slo', sloRoutes);
+
+// Distributed Traces Routes
+app.use('/api/traces', traceRoutes);
 
 // --- IN-MEMORY DATABASE ---
 let systemStatus = {

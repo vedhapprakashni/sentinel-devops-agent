@@ -25,16 +25,21 @@ export function DashboardHeader({ onRefresh }: DashboardHeaderProps) {
         <header className="h-16 flex items-center justify-between px-4 lg:px-6 border-b border-border bg-background/50 backdrop-blur-md sticky top-0 z-30">
             {/* Search - Hidden on mobile, visible on tablet+ */}
             <div className="hidden md:flex items-center gap-4 w-full max-w-md">
-                <div className="relative w-full">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                    <input
-                        type="text"
-                        placeholder="Search services, incidents, logs..."
-                        aria-label="Search services, incidents, logs"
-                        data-search
-                        className="w-full bg-muted border border-border rounded-full py-1.5 pl-10 pr-4 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all placeholder:text-muted-foreground/50"
-                    />
-                </div>
+                <Button 
+                    variant="outline" 
+                    className="w-full justify-start text-muted-foreground bg-muted/50 border-border rounded-full hover:bg-muted font-normal text-sm px-4 py-1.5 h-auto transition-all"
+                    onClick={() => document.querySelector<HTMLInputElement>('[data-search]')?.focus()}
+                    shortcutHint="/"
+                >
+                    <Search className="mr-2 h-4 w-4" />
+                    Global Search
+                </Button>
+                {/* Hidden real input to satisfy focus logic if needed */}
+                <input
+                    type="text"
+                    data-search
+                    className="hidden"
+                />
             </div>
 
             {/* Spacer for mobile to push icons to right */}
@@ -49,6 +54,7 @@ export function DashboardHeader({ onRefresh }: DashboardHeaderProps) {
                             onClick={manualRefresh}
                             className="text-muted-foreground hover:text-foreground"
                             title="Refresh now"
+                            shortcutHint="R"
                         >
                             <RotateCw className="h-4 w-4" />
                         </Button>

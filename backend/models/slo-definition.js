@@ -59,7 +59,7 @@ function create(data) {
         targetAvailability: data.targetAvailability,
         trackingWindow: data.trackingWindow,
         includeScheduledMaintenance: data.includeScheduledMaintenance || false,
-        alertThreshold: data.alertThreshold || 0.25,
+        alertThreshold: data.alertThreshold ?? 0.25,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
     };
@@ -98,7 +98,7 @@ function update(id, data) {
         return null;
     }
 
-    const merged = { ...existing, ...data, id, updatedAt: new Date().toISOString() };
+    const merged = { ...existing, ...data, id, createdAt: existing.createdAt, updatedAt: new Date().toISOString() };
     const errors = validate(merged);
     if (errors.length > 0) {
         throw new Error(`Validation failed: ${errors.join('; ')}`);

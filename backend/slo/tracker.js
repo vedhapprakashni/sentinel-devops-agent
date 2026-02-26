@@ -120,8 +120,10 @@ function seedDemoData() {
     seedService('notification-service', notificationServiceEvents);
 }
 
-// Auto-seed on load
-seedDemoData();
+// Auto-seed on load (skip in test environments / when explicitly disabled)
+if (process.env.NODE_ENV !== 'test' && process.env.SEED_DEMO !== 'false') {
+    seedDemoData();
+}
 
 module.exports = {
     recordDowntime,
