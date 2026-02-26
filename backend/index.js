@@ -13,6 +13,7 @@ const healer = require('./docker/healer');
 // New Services
 const serviceMonitor = require('./services/monitor');
 const incidents = require('./services/incidents');
+const k8sWatcher = require('./kubernetes/watcher');
 
 // Metrics
 const { metricsMiddleware } = require('./metrics/middleware');
@@ -23,6 +24,7 @@ const { startCollectors } = require('./metrics/collectors');
 const authRoutes = require('./routes/auth.routes');
 const usersRoutes = require('./routes/users.routes');
 const rolesRoutes = require('./routes/roles.routes');
+const kubernetesRoutes = require('./routes/kubernetes.routes');
 const { apiLimiter } = require('./middleware/rateLimiter');
 
 const app = express();
@@ -40,6 +42,7 @@ app.use('/api', apiLimiter);
 app.use('/auth', authRoutes);
 app.use('/api/users', usersRoutes);
 app.use('/api/roles', rolesRoutes);
+app.use('/api/kubernetes', kubernetesRoutes); // Kubernetes routes
 app.use('/', metricsRoutes); // Expose /metrics
 
 // Smart Restart Tracking
@@ -253,6 +256,42 @@ const server = app.listen(PORT, '0.0.0.0', () => {
 // Setup WebSocket
 globalWsBroadcaster = setupWebSocket(server);
 serviceMonitor.setWsBroadcaster(globalWsBroadcaster);
+
+// K8s Watcher Event Handling
+k8sWatcher.on('oom', (pod) => {
+    incidents.logActivity('alert', `K8s: Pod ${pod.name} (ns: ${pod.namespace}) OOMKilled`);
+    if (globalWsBroadcaster) {
+        globalWsBroadcaster.broadcast('K8S_EVENT', {
+            type: 'OOM',
+            pod,
+            message: `Pod ${pod.name} was OOMKilled`
+        });
+    }
+});
+
+k8sWatcher.on('crashloop', (pod) => {
+    incidents.logActivity('warn', `K8s: Pod ${pod.name} (ns: ${pod.namespace}) CrashLoopBackOff`);
+    if (globalWsBroadcaster) {
+        globalWsBroadcaster.broadcast('K8S_EVENT', {
+            type: 'CRASHLOOP',
+            pod,
+            message: `Pod ${pod.name} is in CrashLoopBackOff`
+        });
+    }
+});
+
+// Start watching default namespace by default (can be expanded via API)
+k8sWatcher.watchPods('default', (type, pod) => {
+    if (globalWsBroadcaster) {
+        globalWsBroadcaster.broadcast('K8S_POD_UPDATE', { type, pod });
+    }
+});
+k8sWatcher.watchEvents('default', (event) => {
+     if (globalWsBroadcaster) {
+        globalWsBroadcaster.broadcast('K8S_EVENT_STREAM', event);
+    }
+});
+
 
 // Start Monitoring
 serviceMonitor.startMonitoring();
