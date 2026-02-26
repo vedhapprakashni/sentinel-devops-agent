@@ -18,6 +18,13 @@ const rolesRoutes = require('./routes/roles.routes');
 // SLO Routes
 const sloRoutes = require('./routes/slo.routes');
 
+// Runbook Routes
+<<<<<<< HEAD
+const runbooksRoutes = require('./routes/runbooks.routes');
+=======
+const runbookRoutes = require('./routes/runbooks.routes');
+>>>>>>> parent of 15ab4b9 (Revert "feat: Implement runbook builder with frontend UI, backend API, and database schema.")
+
 const app = express();
 const PORT = process.env.PORT || 4000;
 
@@ -33,7 +40,16 @@ app.use('/api/roles', rolesRoutes);
 // SLO Routes
 app.use('/api/slo', sloRoutes);
 
+<<<<<<< HEAD
+// Runbook Routes (GET public; POST/PUT/DELETE protected inside router)
+app.use('/api/runbooks', runbooksRoutes);
+
 // --- IN-MEMORY DATABASE ---
+=======
+// Runbook Routes
+app.use('/api/runbooks', runbookRoutes);
+
+>>>>>>> parent of 15ab4b9 (Revert "feat: Implement runbook builder with frontend UI, backend API, and database schema.")
 let systemStatus = {
   services: {
     auth: { status: 'unknown', code: 0, lastUpdated: null },

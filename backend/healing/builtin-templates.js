@@ -1,0 +1,169 @@
+<<<<<<< HEAD
+/**
+ * Built-in runbook action templates.
+ *
+ * SECURITY: The run_command action type is intentionally restricted to an
+ * explicit allowlist of safe binary names. Arbitrary shell commands are
+ * rejected at the route level before they ever reach a compiler or executor.
+ */
+
+'use strict';
+
+/** @type {string[]} Binaries that a run_command action may invoke. */
+const ALLOWED_COMMAND_BINARIES = Object.freeze([
+    'docker',
+    'kubectl',
+    'systemctl',
+]);
+
+/**
+ * Validate a run_command action's command parameter.
+ *
+ * @param {string|undefined} command - The full command string (e.g. "kubectl rollout restart …")
+ * @returns {{ valid: boolean, reason?: string }}
+ */
+function validateRunCommand(command) {
+    if (!command || typeof command !== 'string') {
+        return { valid: false, reason: 'command must be a non-empty string' };
+    }
+    const binary = command.trim().split(/\s+/)[0];
+    if (!ALLOWED_COMMAND_BINARIES.includes(binary)) {
+        return {
+            valid: false,
+            reason: `Command '${binary}' is not allowed. Permitted binaries: ${ALLOWED_COMMAND_BINARIES.join(', ')}`,
+        };
+    }
+    return { valid: true };
+}
+
+/** Action type definitions shown in the builder UI. */
+const ACTION_TEMPLATES = [
+    {
+        type: 'restart_service',
+        label: 'Restart Service',
+        description: 'Restart a service or container',
+        parameters: { service: '' },
+    },
+    {
+        type: 'scale_service',
+        label: 'Scale Service',
+        description: 'Scale service replicas up or down',
+        parameters: { replicas: 1, mode: 'absolute' },
+    },
+    {
+        type: 'send_alert',
+        label: 'Send Alert',
+        description: 'Send a notification or alert',
+        parameters: { channel: 'slack', message: '' },
+    },
+    {
+        type: 'create_jira',
+        label: 'Create Jira Ticket',
+        description: 'Create a Jira issue for tracking',
+        parameters: { project: '', summary: '', priority: 'Medium' },
+    },
+    {
+        type: 'http_request',
+        label: 'HTTP Request',
+        description: 'Make an HTTP call to an external endpoint',
+        parameters: { url: '', method: 'POST', body: {} },
+=======
+const BUILTIN_CONDITIONS = [
+    {
+        type: 'high_cpu',
+        label: 'High CPU Usage',
+        description: 'Trigger when CPU usage exceeds X% for Y seconds',
+        defaultParameters: { threshold: 90, window: 30 }
+    },
+    {
+        type: 'high_memory',
+        label: 'Memory Leak',
+        description: 'Trigger when memory usage exceeds X% for Y minutes',
+        defaultParameters: { threshold: 80, window: 300 }
+    },
+    {
+        type: 'crash_loop',
+        label: 'Crash Loop',
+        description: 'Trigger when container restarts > N times in M minutes',
+        defaultParameters: { threshold: 3, window: 300 }
+    },
+    {
+        type: 'health_check_fail',
+        label: 'Health Check Failure',
+        description: 'Trigger when health check fails N consecutive times',
+        defaultParameters: { threshold: 3 }
+    },
+    {
+        type: 'error_rate_spike',
+        label: 'Error Rate Spike',
+        description: 'Trigger when error rate exceeds X% in Y minutes',
+        defaultParameters: { threshold: 5, window: 60 }
+    }
+];
+
+const BUILTIN_ACTIONS = [
+    {
+        type: 'restart_container',
+        label: 'Restart Container',
+        description: 'Cleanly restart the affected docker container',
+        parameters: {}
+    },
+    {
+        type: 'scale_replicas',
+        label: 'Scale Replicas',
+        description: 'Scale service replicas up or down',
+        parameters: { replicas: 1, mode: 'absolute' }
+>>>>>>> parent of 15ab4b9 (Revert "feat: Implement runbook builder with frontend UI, backend API, and database schema.")
+    },
+    {
+        type: 'run_command',
+        label: 'Run Command',
+<<<<<<< HEAD
+        description: `Run an allowed shell command (permitted: ${ALLOWED_COMMAND_BINARIES.join(', ')})`,
+        parameters: { command: '' },
+    },
+];
+
+/** Trigger type definitions shown in the builder UI. */
+const TRIGGER_TEMPLATES = [
+    {
+        type: 'webhook',
+        label: 'Webhook',
+        description: 'Trigger via an incoming HTTP webhook',
+        parameters: {},
+    },
+    {
+        type: 'schedule',
+        label: 'Schedule',
+        description: 'Run on a cron schedule',
+        parameters: { cron: '0 * * * *' },
+    },
+    {
+        type: 'threshold',
+        label: 'Threshold Alert',
+        description: 'Fire when a metric crosses a threshold',
+        parameters: { metric: '', threshold: 0, window: '5m' },
+    },
+];
+
+module.exports = { ACTION_TEMPLATES, TRIGGER_TEMPLATES, ALLOWED_COMMAND_BINARIES, validateRunCommand };
+=======
+        description: 'Execute a custom diagnostic command',
+        parameters: { command: 'ps aux' }
+    },
+    {
+        type: 'notify_slack',
+        label: 'Notify Slack',
+        description: 'Send an alert to a Slack channel',
+        parameters: { channel: '#incidents', message: 'Runbook triggered' }
+    },
+    {
+        type: 'create_jira',
+        label: 'Create Jira Ticket',
+        description: 'Open a new issue in Jira project',
+        parameters: { project: 'SENTINEL', priority: 'High' }
+    }
+];
+
+module.exports = { BUILTIN_CONDITIONS, BUILTIN_ACTIONS };
+>>>>>>> parent of 15ab4b9 (Revert "feat: Implement runbook builder with frontend UI, backend API, and database schema.")
