@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -469,8 +468,9 @@ function NodeCard({
             <p className="text-[10px] text-muted-foreground font-mono truncate opacity-50">
                 id: {node.id}
             </p>
-=======
-'use client';
+        </div>
+    );
+}
 
 import { useState, useCallback } from 'react';
 import { Node, Edge, Connection, addEdge, useNodesState, useEdgesState } from '@xyflow/react';
