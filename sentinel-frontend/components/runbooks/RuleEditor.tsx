@@ -3,25 +3,25 @@ import { RunbookTrigger, RunbookAction } from '@/lib/runbook-types';
 
 interface RuleEditorProps {
     item: RunbookTrigger | RunbookAction;
-    onSave: (updated: any) => void;
+    onSave: (updated: RunbookTrigger | RunbookAction) => void;
     onCancel: () => void;
 }
 
 export function RuleEditor({ item, onSave, onCancel }: RuleEditorProps) {
-    const [formData, setFormData] = useState<any>({ ...item });
+    const [formData, setFormData] = useState<RunbookTrigger | RunbookAction>({ ...item } as RunbookTrigger | RunbookAction);
 
     useEffect(() => {
-        setFormData({ ...item });
+        setFormData({ ...item } as RunbookTrigger | RunbookAction);
     }, [item]);
 
     const handleChange = (key: string, value: any) => {
         if ('type' in item && 'parameters' in (formData as RunbookAction)) {
-            setFormData((prev: any) => ({
+            setFormData((prev) => ({
                 ...prev,
                 parameters: { ...prev.parameters, [key]: value }
             }));
         } else {
-            setFormData((prev: any) => ({ ...prev, [key]: value }));
+            setFormData((prev) => ({ ...prev, [key]: value }));
         }
     };
 
