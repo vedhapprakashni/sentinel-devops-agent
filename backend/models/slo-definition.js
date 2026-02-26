@@ -9,7 +9,6 @@ const { v4: uuidv4 } = require('uuid');
 
 // Valid values
 const VALID_WINDOWS = ['1day', '7days', '1month'];
-const VALID_TARGETS = [99, 99.5, 99.9, 99.95, 99.99];
 
 // In-memory SLO store
 const sloStore = new Map();
