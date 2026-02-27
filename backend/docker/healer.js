@@ -1,8 +1,26 @@
 const { docker } = require('./client');
+const { scanImage } = require('../security/scanner');
+const { checkCompliance } = require('../security/policies');
+const { logActivity } = require('../services/incidents'); // Assuming incidents service exists roughly
 
 async function restartContainer(containerId) {
     try {
         const container = docker.getContainer(containerId);
+        
+        // --- Security Check ---
+        const info = await container.inspect();
+        const imageId = info.Image;
+        const scanResult = await scanImage(imageId);
+        const policyCheck = checkCompliance(scanResult);
+
+        if (!policyCheck.compliant) {
+            const errorMsg = `Policy Violation: ${policyCheck.reason}. Blocked restart action.`;
+            console.error(errorMsg);
+            if (logActivity) logActivity('warn', errorMsg);
+            return { action: 'restart', success: false, containerId, error: errorMsg, blocked: true };
+        }
+        // ----------------------
+
         await container.restart({ t: 10 });
         return { action: 'restart', success: true, containerId };
     } catch (error) {
@@ -15,6 +33,19 @@ async function recreateContainer(containerId) {
     try {
         const container = docker.getContainer(containerId);
         const info = await container.inspect();
+
+        // --- Security Check ---
+        const imageId = info.Image;
+        const scanResult = await scanImage(imageId);
+        const policyCheck = checkCompliance(scanResult);
+
+        if (!policyCheck.compliant) {
+            const errorMsg = `Policy Violation: ${policyCheck.reason}. Blocked recreate action.`;
+            console.error(errorMsg);
+             if (logActivity) logActivity('warn', errorMsg);
+            return { action: 'recreate', success: false, containerId, error: errorMsg, blocked: true };
+        }
+        // ----------------------
 
         // Prepare new configuration
         // Use proper mapping for NetworkingConfig from validated inspection

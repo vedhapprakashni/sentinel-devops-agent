@@ -26,6 +26,10 @@ app.use(bodyParser.json());
 // Rate limiters (ADD HERE)
 app.use('/api', apiLimiter);
 
+// Security Routes
+const securityRoutes = require('./routes/security.routes');
+app.use('/api/security', securityRoutes);
+
 // RBAC Routes
 app.use('/auth', authRoutes);
 app.use('/api/users', usersRoutes);
