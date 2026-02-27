@@ -28,8 +28,8 @@ const rolesRoutes = require('./routes/roles.routes');
 const kubernetesRoutes = require('./routes/kubernetes.routes');
 const { apiLimiter } = require('./middleware/rateLimiter');
 
-// SLO Routes
-const sloRoutes = require('./routes/slo.routes');
+// Distributed Traces Routes
+const traceRoutes = require('./routes/traces.routes');
 
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -46,9 +46,46 @@ app.use('/api', apiLimiter);
 app.use('/auth', authRoutes);
 app.use('/api/users', usersRoutes);
 app.use('/api/roles', rolesRoutes);
-app.use('/api/kubernetes', kubernetesRoutes); // Kubernetes routes
-app.use('/api/slo', sloRoutes);
-app.use('/', metricsRoutes); // Expose /metrics
+
+// Distributed Traces Routes
+app.use('/api/traces', traceRoutes);
+
+// --- IN-MEMORY DATABASE ---
+let systemStatus = {
+  services: {
+    auth: { status: 'unknown', code: 0, lastUpdated: null },
+    payment: { status: 'unknown', code: 0, lastUpdated: null },
+    notification: { status: 'unknown', code: 0, lastUpdated: null }
+  },
+  aiAnalysis: "Waiting for AI report...",
+  lastUpdated: new Date()
+};
+
+let activityLog = [];
+let aiLogs = [];
+let nextLogId = 1;
+
+function logActivity(type, message) {
+  const entry = {
+    id: nextLogId++,
+    timestamp: new Date().toISOString(),
+    type,
+    message
+  };
+  activityLog.unshift(entry);
+  if (activityLog.length > 100) activityLog.pop(); // Keep last 100
+  console.log(`[LOG] ${type}: ${message}`);
+}
+
+// WebSocket Broadcaster
+let wsBroadcaster = { broadcast: () => { } };
+
+// Service configuration
+const services = [
+  { name: 'auth', url: 'http://localhost:3001/health' },
+  { name: 'payment', url: 'http://localhost:3002/health' },
+  { name: 'notification', url: 'http://localhost:3003/health' }
+];
 
 // Smart Restart Tracking
 const restartTracker = new Map(); // containerId -> { attempts: number, lastAttempt: number }
