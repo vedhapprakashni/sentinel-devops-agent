@@ -15,6 +15,7 @@ const authRoutes = require('./routes/auth.routes');
 const usersRoutes = require('./routes/users.routes');
 const rolesRoutes = require('./routes/roles.routes');
 const { apiLimiter } = require('./middleware/rateLimiter');
+const { requireAuth } = require('./auth/middleware');
 
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -28,7 +29,7 @@ app.use('/api', apiLimiter);
 
 // Security Routes
 const securityRoutes = require('./routes/security.routes');
-app.use('/api/security', securityRoutes);
+app.use('/api/security', requireAuth, securityRoutes);
 
 // RBAC Routes
 app.use('/auth', authRoutes);

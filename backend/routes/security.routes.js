@@ -1,12 +1,14 @@
 const express = require('express');
 const router = express.Router();
-const { scanImage, startScanner } = require('../security/scanner');
+const { scanImage, startScanner, clearCache } = require('../security/scanner');
 const { getPolicy, updatePolicy, checkCompliance } = require('../security/policies');
 const containerMonitor = require('../docker/monitor');
 
-router.get('/scan/:imageId', async (req, res) => {
+// Use query param ?imageId=... since image names can contain /
+router.get('/scan', async (req, res) => {
     try {
-        const imageId = req.params.imageId;
+        const imageId = req.query.imageId;
+        if (!imageId) return res.status(400).json({ error: 'imageId query parameter required' });
         const result = await scanImage(imageId);
         res.json(result);
     } catch (error) {
@@ -14,9 +16,10 @@ router.get('/scan/:imageId', async (req, res) => {
     }
 });
 
-router.get('/compliance/:imageId', async (req, res) => {
+router.get('/compliance', async (req, res) => {
     try {
-        const imageId = req.params.imageId;
+        const imageId = req.query.imageId;
+        if (!imageId) return res.status(400).json({ error: 'imageId query parameter required' });
         const result = await scanImage(imageId);
         const check = checkCompliance(result);
         res.json({ ...check, scannedAt: result.scannedAt });
@@ -25,11 +28,13 @@ router.get('/compliance/:imageId', async (req, res) => {
     }
 });
 
+const { requirePermissions } = require('../auth/middleware');
+
 router.get('/policies', (req, res) => {
     res.json(getPolicy());
 });
 
-router.post('/policies', (req, res) => {
+router.post('/policies', requirePermissions('security:write'), (req, res) => {
     try {
         const newPolicy = req.body;
         updatePolicy(newPolicy);
@@ -43,15 +48,12 @@ router.post('/policies', (req, res) => {
 router.post('/scan-all', async (req, res) => {
     const force = req.query.force === 'true';
     if (force) {
-        require('../security/scanner').clearCache();
+        clearCache();
     }
     
-    // We assume containerMonitor has a method or property to get active containers
-    // From previous context: containerMonitor.getMetrics(id) returns metrics
-    // We might need to inject the list of containers or fetch them via docker client
-    
-    // For now returning OK, as actual scanning is typically background task
-    res.json({ message: 'Scan initiated' });
+    return res.status(501).json({
+        error: 'scan-all not implemented: no container enumeration/dispatch is currently performed'
+    });
 });
 
 module.exports = router;

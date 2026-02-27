@@ -16,11 +16,12 @@ class ContainerMonitor {
             const data = await container.inspect();
             const imageId = data.Image;
 
-            // Start security scanning (every 24h or on start)
-            this.scheduleSecurityScan(containerId, imageId);
-
             const stream = await container.stats({ stream: true });
+            
+            this.watchers.set(containerId, stream);
 
+            // Schedule periodic scans after successful stream setup
+            this.scheduleSecurityScan(containerId, imageId);
 
             stream.on('data', (chunk) => {
                 try {
@@ -39,10 +40,11 @@ class ContainerMonitor {
             stream.on('end', () => {
                 this.stopMonitoring(containerId);
             });
-
-            this.watchers.set(containerId, stream);
+            
+            // watchers.set was moved up
         } catch (error) {
             console.error(`Failed to start monitoring ${containerId}:`, error);
+            this.stopMonitoring(containerId); // Clean up any timers/watchers
         }
     }
 

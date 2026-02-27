@@ -33,12 +33,26 @@ export default function SecurityDashboardPage() {
     
     setScanning(prev => ({ ...prev, [imageId]: true }));
     try {
-      const res = await fetch(`${API_BASE}/api/security/scan/${encodeURIComponent(imageId)}`);
+      const res = await fetch(`${API_BASE}/api/security/scan?imageId=${encodeURIComponent(imageId)}`);
       if (!res.ok) throw new Error('Scan failed');
       const data = await res.json();
       setScanResults(prev => ({ ...prev, [imageId]: data }));
     } catch (err) {
       console.error(`Failed to scan ${imageId}:`, err);
+      const message = err instanceof Error ? err.message : 'Scan failed';
+      setScanResults(prev => ({
+        ...prev,
+        [imageId]: {
+          imageId,
+          scannedAt: new Date().toISOString(),
+          criticalCount: 0,
+          highCount: 0,
+          mediumCount: 0,
+          lowCount: 0,
+          vulnerabilities: [],
+          error: message,
+        },
+      }));
     } finally {
       setScanning(prev => ({ ...prev, [imageId]: false }));
     }

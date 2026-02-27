@@ -11,13 +11,29 @@ function getPolicy() {
 }
 
 function updatePolicy(newPolicy) {
-    Object.assign(policies, newPolicy);
+    const allowed = ['allowCritical', 'allowHigh', 'blockDeployment', 'ignorePackages', 'warningOnly'];
+    for (const key of Object.keys(newPolicy || {})) {
+        if (!allowed.includes(key)) continue;
+        if (key === 'ignorePackages') {
+            if (!Array.isArray(newPolicy[key])) throw new Error('ignorePackages must be an array');
+            policies[key] = newPolicy[key].map(String);
+        } else {
+            if (typeof newPolicy[key] !== 'boolean') throw new Error(`${key} must be boolean`);
+            policies[key] = newPolicy[key];
+        }
+    }
     return policies;
 }
 
 function checkCompliance(scanResult) {
-    if (!scanResult || scanResult.error) return { compliant: true, reason: 'Scan failed or skipped' };
+    if (!scanResult || scanResult.error) {
+        if (policies.warningOnly) {
+            return { compliant: true, warning: 'Scan failed; allowing due to warningOnly mode' };
+        }
+        return { compliant: false, reason: 'Scan failed or skipped' };
+    }
     
+    // Check specific policy logic
     if (policies.warningOnly) return { compliant: true, warning: 'Policy violation detected (Warning Mode)' };
 
     // Ignore blocked packages/vulns logic could be added here
