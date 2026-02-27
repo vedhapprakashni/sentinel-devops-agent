@@ -3,6 +3,7 @@ require('dotenv').config();
 
 const { setupWebSocket } = require('./websocket');
 const express = require('express');
+const { ERRORS } = require('./lib/errors');
 const cors = require('cors');
 const bodyParser = require('body-parser');
 const axios = require('axios');
@@ -25,6 +26,9 @@ const usersRoutes = require('./routes/users.routes');
 const rolesRoutes = require('./routes/roles.routes');
 const { apiLimiter } = require('./middleware/rateLimiter');
 
+// SLO Routes
+const sloRoutes = require('./routes/slo.routes');
+
 const app = express();
 const PORT = process.env.PORT || 4000;
 
@@ -38,6 +42,7 @@ app.use('/api', apiLimiter);
 
 // Routes
 app.use('/auth', authRoutes);
+app.use('/api/slo', sloRoutes);
 app.use('/api/users', usersRoutes);
 app.use('/api/roles', rolesRoutes);
 app.use('/', metricsRoutes); // Expose /metrics
@@ -111,7 +116,7 @@ app.post('/api/action/:service/:type', async (req, res) => {
   incidents.logActivity('info', `Triggering action '${type}' on service '${service}'`);
 
   if (!port) {
-    incidents.logActivity('warn', `Failed action '${type}': Invalid service '${service}'`);
+    incidents.logActivity('warn'ERRORS.SERVICE_NOT_FOUND(service).toJSON()'${service}'`);
     return res.status(400).json({ success: false, error: 'Invalid service' });
   }
 
@@ -129,7 +134,7 @@ app.post('/api/action/:service/:type', async (req, res) => {
     res.json({ success: true, message: `${type} executed on ${service}` });
   } catch (error) {
     incidents.logActivity('error', `Action '${type}' on ${service} failed: ${error.message}`);
-    res.status(500).json({ success: false, error: error.message });
+    res.status(500).json(ERRORS.ACTION_FAILED().toJSON());
   }
 });
 
@@ -144,15 +149,16 @@ const requireDockerAuth = (req, res, next) => {
 
 const validateId = (req, res, next) => {
   if (!req.params.id || typeof req.params.id !== 'string' || req.params.id.length < 1) {
-    return res.status(400).json({ error: 'Invalid ID provided' });
+    return res.status(400).json(ERRORS.INVALID_ID().toJSON());
   }
   next();
 };
 
 const validateScaleParams = (req, res, next) => {
-  const replicas = parseInt(req.params.replicas, 10);
-  if (!req.params.service || isNaN(replicas) || replicas < 0 || replicas > 100) {
-    return res.status(400).json({ error: 'Invalid scale parameters' });
+  const replicasRaw = req.params.replicas;
+  const replicas = Number(replicasRaw);
+  if (!req.params.service || !/^\d+$/.test(replicasRaw) || !Number.isInteger(replicas) || replicas < 0 || replicas > 100) {
+    return res.status(400).json(ERRORS.INVALID_SCALE_PARAMS().toJSON());
   }
   next();
 };
@@ -176,7 +182,7 @@ app.get('/api/docker/containers', async (req, res) => {
 
     res.json({ containers: enrichedContainers });
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    res.status(500).json(ERRORS.DOCKER_CONNECTION().toJSON());
   }
 });
 
@@ -185,13 +191,16 @@ app.get('/api/docker/health/:id', validateId, async (req, res) => {
     const health = await getContainerHealth(req.params.id);
     res.json(health);
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    res.status(500).json(ERRORS.DOCKER_CONNECTION().toJSON());
   }
 });
 
 app.get('/api/docker/metrics/:id', validateId, (req, res) => {
   const metrics = containerMonitor.getMetrics(req.params.id);
-  res.json(metrics || { error: 'No metrics available' });
+  if (!metrics) {
+    return res.status(404).json(ERRORS.NO_DATA().toJSON());
+  }
+  res.json(metrics);
 });
 
 app.post('/api/docker/try-restart/:id', requireDockerAuth, validateId, async (req, res) => {
@@ -202,22 +211,19 @@ app.post('/api/docker/try-restart/:id', requireDockerAuth, validateId, async (re
   // Reset attempts if outside grace period
   if (now - tracker.lastAttempt > GRACE_PERIOD_MS) {
     tracker.attempts = 0;
-  }
-
-  if (tracker.attempts >= MAX_RESTARTS) {
-    return res.status(429).json({
-      allowed: false,
-      reason: 'Max restart attempts exceeded',
-      nextRetry: new Date(tracker.lastAttempt + GRACE_PERIOD_MS)
-    });
+  }ERRORS.MAX_RESTARTS_EXCEEDED().toJSON());
   }
 
   tracker.attempts++;
   tracker.lastAttempt = now;
   restartTracker.set(id, tracker);
 
-  const result = await healer.restartContainer(id);
-  res.json({ allowed: true, ...result });
+  try {
+    const result = await healer.restartContainer(id);
+    res.json({ allowed: true, ...result });
+  } catch (error) {
+    res.status(500).json(ERRORS.ACTION_FAILED().toJSON());
+  }
 });
 
 app.post('/api/docker/restart/:id', requireDockerAuth, validateId, async (req, res) => {
@@ -230,15 +236,30 @@ app.post('/api/docker/restart/:id', requireDockerAuth, validateId, async (req, r
   tracker.lastAttempt = now;
   restartTracker.set(id, tracker);
 
-  const result = await healer.restartContainer(id);
-  res.json(result);
+  try {
+    const result = await healer.restartContainer(id);
+    res.json(result);
+  } catch (error) {
+    res.status(500).json(ERRORS.ACTION_FAILED().toJSON());
+  }
 });
 
 app.post('/api/docker/recreate/:id', requireDockerAuth, validateId, async (req, res) => {
-  const result = await healer.recreateContainer(req.params.id);
-  res.json(result);
+  try {
+    const result = await healer.recreateContainer(req.params.id);
+    res.json(result);
+  } catch (error) {
+    res.status(500).json(ERRORS.ACTION_FAILED().toJSON());
+  }
 });
 
+app.post('/api/docker/scale/:service/:replicas', requireDockerAuth, validateScaleParams, async (req, res) => {
+  try {
+    const result = await healer.scaleService(req.params.service, req.params.replicas);
+    res.json(result);
+  } catch (error) {
+    res.status(500).json(ERRORS.ACTION_FAILED().toJSON());
+  }
 app.post('/api/docker/scale/:service/:replicas', requireDockerAuth, validateScaleParams, async (req, res) => {
   const result = await healer.scaleService(req.params.service, req.params.replicas);
   res.json(result);
