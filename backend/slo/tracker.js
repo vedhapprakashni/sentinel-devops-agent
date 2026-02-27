@@ -62,6 +62,13 @@ function clearAll() {
 }
 
 /**
+ * Clear tracked data for a specific service.
+ */
+function clearService(serviceId) {
+    downtimeStore.delete(serviceId);
+}
+
+/**
  * Seed demo downtime data for demonstration purposes.
  */
 function seedDemoData() {
@@ -120,15 +127,14 @@ function seedDemoData() {
     seedService('notification-service', notificationServiceEvents);
 }
 
-// Auto-seed on load (skip in test environments / when explicitly disabled)
-if (process.env.NODE_ENV !== 'test' && process.env.SEED_DEMO !== 'false') {
-    seedDemoData();
-}
+// Auto-seed on load
+seedDemoData();
 
 module.exports = {
     recordDowntime,
     getIncidents,
     getAllIncidents,
     clearAll,
+    clearService,
     seedDemoData,
 };
