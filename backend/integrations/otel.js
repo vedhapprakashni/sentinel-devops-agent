@@ -25,6 +25,10 @@ class OpenTelemetryClient {
   /**
    * Query traces by service name and time range.
    * startTime / endTime are expected in epoch milliseconds.
+   *
+   * Unit conversions:
+   *   Jaeger API expects microseconds  → multiply ms by 1,000
+   *   Tempo  API expects seconds       → divide   ms by 1,000
    */
   async queryTraces(serviceName, startTime, endTime) {
     const traces = [];
