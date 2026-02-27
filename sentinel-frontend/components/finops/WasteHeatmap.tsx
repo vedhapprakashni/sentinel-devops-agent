@@ -29,13 +29,16 @@ export function WasteHeatmap({ containers }: WasteHeatmapProps) {
                         No containers available to analyze.
                     </div>
                 ) : (
-                    <div className="grid grid-cols-5 sm:grid-cols-8 md:grid-cols-10 gap-2 py-4">
+                    <div role="grid" aria-label="Resource efficiency heatmap" className="grid grid-cols-5 sm:grid-cols-8 md:grid-cols-10 gap-2 py-4">
                         {containers.map((c) => (
                             <div
                                 key={c.name}
+                                role="gridcell"
+                                tabIndex={0}
+                                aria-label={`${c.name}: ${c.wasteClass}, CPU ${c.avgCPUPercent ?? 'N/A'}%, Memory ${c.avgMemPercent ?? 'N/A'}%`}
                                 title={`${c.name} (${c.wasteClass})\nCPU: ${c.avgCPUPercent ?? 'N/A'}%\nMem: ${c.avgMemPercent ?? 'N/A'}%`}
                                 className={cn(
-                                    "aspect-square rounded-md cursor-pointer transition-all hover:scale-110",
+                                    "aspect-square rounded-md transition-all hover:scale-110 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-1",
                                     c.wasteClass === 'healthy' && "bg-green-500/80 shadow-[0_0_10px_rgba(34,197,94,0.3)]",
                                     c.wasteClass === 'over-provisioned' && "bg-yellow-500/80 shadow-[0_0_10px_rgba(234,179,8,0.3)]",
                                     c.wasteClass === 'idle' && "bg-orange-500/80 shadow-[0_0_10px_rgba(249,115,22,0.3)]",

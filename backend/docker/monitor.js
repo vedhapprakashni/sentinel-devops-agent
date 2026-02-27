@@ -56,6 +56,7 @@ class ContainerMonitor {
             if (stream.destroy) stream.destroy();
             this.watchers.delete(containerId);
             this.metrics.delete(containerId);
+            this.lastStorePush.delete(containerId);
             store.clear(containerId);
         }
     }

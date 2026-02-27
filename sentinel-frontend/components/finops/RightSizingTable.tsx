@@ -36,8 +36,8 @@ export function RightSizingTable({ containers }: RightSizingTableProps) {
                         </thead>
                         <tbody className="divide-y divide-border/50">
                             {wasteful.length > 0 ? (
-                                wasteful.map((c, i) => (
-                                    <tr key={c.name + i} className="group hover:bg-white/5 transition-colors">
+                                wasteful.map((c) => (
+                                    <tr key={c.name} className="group hover:bg-white/5 transition-colors">
                                         <td className="py-4 px-2 font-medium">{c.name}</td>
                                         <td className="py-4 px-2">
                                             <div className="flex flex-col gap-1">
