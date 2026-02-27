@@ -27,6 +27,7 @@ const usersRoutes = require('./routes/users.routes');
 const rolesRoutes = require('./routes/roles.routes');
 const kubernetesRoutes = require('./routes/kubernetes.routes');
 const { apiLimiter } = require('./middleware/rateLimiter');
+const { requireAuth } = require('./auth/middleware');
 
 // Distributed Traces Routes
 const traceRoutes = require('./routes/traces.routes');
@@ -42,7 +43,11 @@ app.use(metricsMiddleware); // Metrics middleware
 // Rate limiters
 app.use('/api', apiLimiter);
 
-// Routes
+// Security Routes
+const securityRoutes = require('./routes/security.routes');
+app.use('/api/security', requireAuth, securityRoutes);
+
+// RBAC Routes
 app.use('/auth', authRoutes);
 app.use('/api/users', usersRoutes);
 app.use('/api/roles', rolesRoutes);

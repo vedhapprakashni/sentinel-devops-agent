@@ -1,9 +1,11 @@
 const { docker } = require('./client');
+const { scanImage } = require('../security/scanner');
 
 class ContainerMonitor {
     constructor() {
         this.metrics = new Map();
         this.watchers = new Map();
+        this.securityTimers = new Map();
     }
 
     async startMonitoring(containerId) {
@@ -11,7 +13,15 @@ class ContainerMonitor {
 
         try {
             const container = docker.getContainer(containerId);
+            const data = await container.inspect();
+            const imageId = data.Image;
+
             const stream = await container.stats({ stream: true });
+            
+            this.watchers.set(containerId, stream);
+
+            // Schedule periodic scans after successful stream setup
+            this.scheduleSecurityScan(containerId, imageId);
 
             stream.on('data', (chunk) => {
                 try {
@@ -30,10 +40,11 @@ class ContainerMonitor {
             stream.on('end', () => {
                 this.stopMonitoring(containerId);
             });
-
-            this.watchers.set(containerId, stream);
+            
+            // watchers.set was moved up
         } catch (error) {
             console.error(`Failed to start monitoring ${containerId}:`, error);
+            this.stopMonitoring(containerId); // Clean up any timers/watchers
         }
     }
 
@@ -44,6 +55,23 @@ class ContainerMonitor {
             this.watchers.delete(containerId);
             this.metrics.delete(containerId);
         }
+        if (this.securityTimers.has(containerId)) {
+            clearInterval(this.securityTimers.get(containerId));
+            this.securityTimers.delete(containerId);
+        }
+    }
+
+    scheduleSecurityScan(containerId, imageId) {
+        // Run scan immediately if not cached recently (scanner internally checks cache)
+        scanImage(imageId).catch(err => console.error(`[Security] Automated scan failed for ${containerId}:`, err.message));
+
+        // Schedule periodic scans (e.g., daily)
+        const interval = 24 * 60 * 60 * 1000;
+        const timer = setInterval(() => {
+            scanImage(imageId).catch(err => console.error(`[Security] Periodic scan failed for ${containerId}:`, err.message));
+        }, interval);
+        
+        this.securityTimers.set(containerId, timer);
     }
 
     parseStats(stats) {
