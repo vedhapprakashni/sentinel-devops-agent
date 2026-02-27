@@ -300,20 +300,3 @@ k8sWatcher.on('crashloop', (pod) => {
         });
     }
 });
-
-// Start watching default namespace by default (can be expanded via API)
-k8sWatcher.watchPods('default', (type, pod) => {
-    if (globalWsBroadcaster) {
-        globalWsBroadcaster.broadcast('K8S_POD_UPDATE', { type, pod });
-    }
-});
-k8sWatcher.watchEvents('default', (event) => {
-     if (globalWsBroadcaster) {
-        globalWsBroadcaster.broadcast('K8S_EVENT_STREAM', event);
-    }
-});
-
-
-// Start Monitoring
-serviceMonitor.startMonitoring();
-startCollectors(); // Start Prometheus collectors
