@@ -59,12 +59,7 @@ export const showStatus = async () => {
             statusText = 'DEGRADED';
         }
 
-        table.push([
-            chalk.bold(name.toUpperCase()),
-            statusColor(statusText),
-            code
-        ]);
-    });
+        console.log(chalk.bold.cyan('\nSentinel System Status'));
 
     console.log(table.toString());
         if (data.lastUpdated) {
@@ -92,39 +87,29 @@ export const generateReport = async () => {
     try {
         const insights = await getInsights();
 
-    if (insights.length === 0) {
-        console.log(chalk.yellow('No AI insights found to report.'));
-        return;
-    }
+        if (insights.length === 0) {
+            console.log(chalk.yellow('No AI insights found to report.'));
+            return;
+        }
 
-    // Filter and categorize insights (don't mutate original array)
-    const incidents = [];
-    const healthyPeriods = [];
-    let lastStatus = null;
-    let healthyStart = null;
+        // Filter and categorize insights (don't mutate original array)
+        const incidents = [];
+        const healthyPeriods = [];
+        let lastStatus = null;
+        let healthyStart = null;
 
-    const chronological = [...insights].reverse();
-    chronological.forEach((item) => {
-        const analysis = item.analysis || item.summary || '';
-        const isHealthy = analysis.includes('HEALTHY');
-        const isCritical = analysis.includes('CRITICAL');
-        const isDegraded = analysis.includes('DEGRADED');
+        const chronological = [...insights].reverse();
+        chronological.forEach((item) => {
+            const analysis = item.analysis || item.summary || '';
+            const isHealthy = analysis.includes('HEALTHY');
+            const isCritical = analysis.includes('CRITICAL');
+            const isDegraded = analysis.includes('DEGRADED');
 
-        if (isCritical || isDegraded) {
-            // Always record incidents
-            incidents.push({
-                timestamp: item.timestamp,
-                severity: isCritical ? 'CRITICAL' : 'DEGRADED',
-                analysis: analysis
-            });
-            lastStatus = 'incident';
-            healthyStart = null;
-        } else if (isHealthy) {
-            if (lastStatus === 'incident') {
-                // Record recovery
-                healthyPeriods.push({
+            if (isCritical || isDegraded) {
+                // Always record incidents
+                incidents.push({
                     timestamp: item.timestamp,
-                    type: 'recovery',
+                    severity: isCritical ? 'CRITICAL' : 'DEGRADED',
                     analysis: analysis
                 });
                 healthyStart = item.timestamp;
@@ -203,3 +188,4 @@ export const generateReport = async () => {
         printError(err);
     }
 };
+

@@ -20,9 +20,6 @@ const { apiLimiter } = require('./middleware/rateLimiter');
 // SLO Routes
 const sloRoutes = require('./routes/slo.routes');
 
-// Runbook Routes
-const runbooksRoutes = require('./routes/runbooks.routes');
-
 const app = express();
 const PORT = process.env.PORT || 4000;
 

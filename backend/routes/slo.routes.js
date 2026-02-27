@@ -2,6 +2,7 @@
  * SLO Routes
  * 
  * RESTful API endpoints for SLO/SLA tracking and error budget management.
+ * Read endpoints are public; mutating endpoints require auth + RBAC.
  */
 
 const express = require('express');
@@ -9,6 +10,7 @@ const router = express.Router();
 const sloModel = require('../models/slo-definition');
 const tracker = require('../slo/tracker');
 const { calculateErrorBudget, generateBurndownData, MINUTES_PER_WINDOW } = require('../slo/calculator');
+const { requireAuth, requirePermissions } = require('../auth/middleware');
 
 /**
  * GET /api/slo
@@ -67,8 +69,9 @@ router.get('/:id', (req, res) => {
 /**
  * POST /api/slo
  * Create a new SLO definition.
+ * Requires authentication and slo:write permission.
  */
-router.post('/', (req, res) => {
+router.post('/', requireAuth, requirePermissions('slo:write'), (req, res) => {
     try {
         const slo = sloModel.create(req.body);
         res.status(201).json(slo);
@@ -80,8 +83,9 @@ router.post('/', (req, res) => {
 /**
  * PUT /api/slo/:id
  * Update an existing SLO definition.
+ * Requires authentication and slo:write permission.
  */
-router.put('/:id', (req, res) => {
+router.put('/:id', requireAuth, requirePermissions('slo:write'), (req, res) => {
     try {
         const slo = sloModel.update(req.params.id, req.body);
         if (!slo) {
@@ -96,13 +100,20 @@ router.put('/:id', (req, res) => {
 /**
  * DELETE /api/slo/:id
  * Delete an SLO definition.
+ * Requires authentication and slo:delete permission.
  */
-router.delete('/:id', (req, res) => {
+router.delete('/:id', requireAuth, requirePermissions('slo:delete'), (req, res) => {
     try {
+        const slo = sloModel.getById(req.params.id);
+        if (!slo) {
+            return res.status(404).json({ error: 'SLO definition not found' });
+        }
+
         const deleted = sloModel.remove(req.params.id);
         if (!deleted) {
             return res.status(404).json({ error: 'SLO definition not found' });
         }
+        tracker.clearService(slo.serviceId);
         res.json({ success: true, message: 'SLO definition deleted' });
     } catch (error) {
         res.status(500).json({ error: error.message });
@@ -112,8 +123,9 @@ router.delete('/:id', (req, res) => {
 /**
  * POST /api/slo/:id/downtime
  * Record a downtime event for the service associated with this SLO.
+ * Requires authentication and slo:write permission.
  */
-router.post('/:id/downtime', (req, res) => {
+router.post('/:id/downtime', requireAuth, requirePermissions('slo:write'), (req, res) => {
     try {
         const slo = sloModel.getById(req.params.id);
         if (!slo) {
@@ -148,9 +160,13 @@ router.get('/:id/burndown', (req, res) => {
             return res.status(404).json({ error: 'SLO definition not found' });
         }
 
-        const incidents = tracker.getIncidents(slo.serviceId);
-        const points = parseInt(req.query.points) || 30;
-        const burndown = generateBurndownData(slo, incidents, Math.min(points, 100));
+        const windowMinutes = MINUTES_PER_WINDOW[slo.trackingWindow];
+        const windowStart = Date.now() - windowMinutes * 60 * 1000;
+        const incidents = tracker.getIncidents(slo.serviceId).filter(i => i.resolvedAt >= windowStart);
+
+        let points = parseInt(req.query.points, 10) || 30;
+        points = Math.max(1, Math.min(points, 100));
+        const burndown = generateBurndownData(slo, incidents, points);
 
         res.json({ burndown });
     } catch (error) {
