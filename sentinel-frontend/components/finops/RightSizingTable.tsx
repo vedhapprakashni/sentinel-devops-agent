@@ -5,6 +5,7 @@ import { cn } from '@/lib/utils';
 
 interface RightSizingTableProps {
     containers: Array<{
+        containerId: string;
         name: string;
         wasteClass: string;
         potentialSavingsMonthly: number;
@@ -37,7 +38,7 @@ export function RightSizingTable({ containers }: RightSizingTableProps) {
                         <tbody className="divide-y divide-border/50">
                             {wasteful.length > 0 ? (
                                 wasteful.map((c) => (
-                                    <tr key={c.name} className="group hover:bg-white/5 transition-colors">
+                                    <tr key={c.containerId} className="group hover:bg-white/5 transition-colors">
                                         <td className="py-4 px-2 font-medium">{c.name}</td>
                                         <td className="py-4 px-2">
                                             <div className="flex flex-col gap-1">
