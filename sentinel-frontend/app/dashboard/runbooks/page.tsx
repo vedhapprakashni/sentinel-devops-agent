@@ -148,47 +148,6 @@ export default function RunbooksPage() {
                         </li>
                     ))}
                 </ul>
-                                    </div>
-                                    <p className="text-slate-400 text-sm line-clamp-2">{runbook.description}</p>
-                                </div>
-
-                                <div className="flex gap-2">
-                                    <button
-                                        onClick={() => toggleEnabled(runbook.id, runbook.enabled)}
-                                        className={`p-2 rounded-lg transition-colors ${runbook.enabled ? 'hover:bg-amber-500/10 text-amber-500' : 'hover:bg-emerald-500/10 text-emerald-500'}`}
-                                        title={runbook.enabled ? "Pause" : "Activate"}
-                                    >
-                                        <Zap className="w-5 h-5" />
-                                    </button>
-                                    <button
-                                        onClick={() => deleteRunbook(runbook.id)}
-                                        className="p-2 hover:bg-red-500/10 text-red-400 rounded-lg transition-colors"
-                                        title="Delete"
-                                    >
-                                        <Trash2 className="w-5 h-5" />
-                                    </button>
-                                </div>
-                            </div>
-
-                            <div className="mt-6 pt-6 border-t border-slate-800/50 flex items-center justify-between text-xs text-slate-500">
-                                <div className="flex items-center gap-6">
-                                    <div className="flex items-center gap-2">
-                                        <Search className="w-3 h-3" /> {runbook.triggers.length} Triggers
-                                    </div>
-                                    <div className="flex items-center gap-2">
-                                        <Play className="w-3 h-3" /> {runbook.actions.length} Actions
-                                    </div>
-                                    <div className="flex items-center gap-2">
-                                        <Clock className="w-3 h-3" /> v{runbook.version}
-                                    </div>
-                                </div>
-                                <div>
-                                    Updated {new Date(runbook.updated_at || '').toLocaleDateString()}
-                                </div>
-                            </div>
-                        </div>
-                    ))}
-                </ul>
             )}
         </div>
     );
