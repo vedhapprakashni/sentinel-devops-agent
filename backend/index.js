@@ -14,6 +14,7 @@ const healer = require('./docker/healer');
 // New Services
 const serviceMonitor = require('./services/monitor');
 const incidents = require('./services/incidents');
+const k8sWatcher = require('./kubernetes/watcher');
 
 // Metrics
 const { metricsMiddleware } = require('./metrics/middleware');
@@ -24,6 +25,7 @@ const { startCollectors } = require('./metrics/collectors');
 const authRoutes = require('./routes/auth.routes');
 const usersRoutes = require('./routes/users.routes');
 const rolesRoutes = require('./routes/roles.routes');
+const kubernetesRoutes = require('./routes/kubernetes.routes');
 const { apiLimiter } = require('./middleware/rateLimiter');
 
 // SLO Routes
@@ -42,9 +44,10 @@ app.use('/api', apiLimiter);
 
 // Routes
 app.use('/auth', authRoutes);
-app.use('/api/slo', sloRoutes);
 app.use('/api/users', usersRoutes);
 app.use('/api/roles', rolesRoutes);
+app.use('/api/kubernetes', kubernetesRoutes); // Kubernetes routes
+app.use('/api/slo', sloRoutes);
 app.use('/', metricsRoutes); // Expose /metrics
 
 // Smart Restart Tracking
@@ -116,8 +119,8 @@ app.post('/api/action/:service/:type', async (req, res) => {
   incidents.logActivity('info', `Triggering action '${type}' on service '${service}'`);
 
   if (!port) {
-    incidents.logActivity('warn'ERRORS.SERVICE_NOT_FOUND(service).toJSON()'${service}'`);
-    return res.status(400).json({ success: false, error: 'Invalid service' });
+    incidents.logActivity('warn', `Failed action '${type}': Invalid service '${service}'`);
+    return res.status(400).json(ERRORS.SERVICE_NOT_FOUND(service).toJSON());
   }
 
   try {
@@ -211,7 +214,10 @@ app.post('/api/docker/try-restart/:id', requireDockerAuth, validateId, async (re
   // Reset attempts if outside grace period
   if (now - tracker.lastAttempt > GRACE_PERIOD_MS) {
     tracker.attempts = 0;
-  }ERRORS.MAX_RESTARTS_EXCEEDED().toJSON());
+  }
+
+  if (tracker.attempts >= MAX_RESTARTS) {
+    return res.status(429).json(ERRORS.MAX_RESTARTS_EXCEEDED().toJSON());
   }
 
   tracker.attempts++;
@@ -260,9 +266,6 @@ app.post('/api/docker/scale/:service/:replicas', requireDockerAuth, validateScal
   } catch (error) {
     res.status(500).json(ERRORS.ACTION_FAILED().toJSON());
   }
-app.post('/api/docker/scale/:service/:replicas', requireDockerAuth, validateScaleParams, async (req, res) => {
-  const result = await healer.scaleService(req.params.service, req.params.replicas);
-  res.json(result);
 });
 
 let globalWsBroadcaster;
@@ -274,6 +277,42 @@ const server = app.listen(PORT, '0.0.0.0', () => {
 // Setup WebSocket
 globalWsBroadcaster = setupWebSocket(server);
 serviceMonitor.setWsBroadcaster(globalWsBroadcaster);
+
+// K8s Watcher Event Handling
+k8sWatcher.on('oom', (pod) => {
+    incidents.logActivity('alert', `K8s: Pod ${pod.name} (ns: ${pod.namespace}) OOMKilled`);
+    if (globalWsBroadcaster) {
+        globalWsBroadcaster.broadcast('K8S_EVENT', {
+            type: 'OOM',
+            pod,
+            message: `Pod ${pod.name} was OOMKilled`
+        });
+    }
+});
+
+k8sWatcher.on('crashloop', (pod) => {
+    incidents.logActivity('warn', `K8s: Pod ${pod.name} (ns: ${pod.namespace}) CrashLoopBackOff`);
+    if (globalWsBroadcaster) {
+        globalWsBroadcaster.broadcast('K8S_EVENT', {
+            type: 'CRASHLOOP',
+            pod,
+            message: `Pod ${pod.name} is in CrashLoopBackOff`
+        });
+    }
+});
+
+// Start watching default namespace by default (can be expanded via API)
+k8sWatcher.watchPods('default', (type, pod) => {
+    if (globalWsBroadcaster) {
+        globalWsBroadcaster.broadcast('K8S_POD_UPDATE', { type, pod });
+    }
+});
+k8sWatcher.watchEvents('default', (event) => {
+     if (globalWsBroadcaster) {
+        globalWsBroadcaster.broadcast('K8S_EVENT_STREAM', event);
+    }
+});
+
 
 // Start Monitoring
 serviceMonitor.startMonitoring();

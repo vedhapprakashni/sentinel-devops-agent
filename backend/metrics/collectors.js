@@ -70,12 +70,17 @@ function recordHealingAction(action) {
 
 // Start periodic collection
 function startCollectors(intervalMs = 15000) {
+  let isCollecting = false;
   setInterval(async () => {
+    if (isCollecting) return; // Prevent overlaps
+    isCollecting = true;
     try {
       await collectServiceMetrics();
       await collectIncidentMetrics();
     } catch (error) {
-      console.error('Error collecting metrics:', error);
+      console.error('Error in metrics collection:', error.message);
+    } finally {
+      isCollecting = false;
     }
   }, intervalMs);
 }
