@@ -71,8 +71,12 @@ function recordHealingAction(action) {
 // Start periodic collection
 function startCollectors(intervalMs = 15000) {
   setInterval(async () => {
-    await collectServiceMetrics();
-    await collectIncidentMetrics();
+    try {
+      await collectServiceMetrics();
+      await collectIncidentMetrics();
+    } catch (error) {
+      console.error('Error collecting metrics:', error);
+    }
   }, intervalMs);
 }
 
