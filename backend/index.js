@@ -31,6 +31,9 @@ const { apiLimiter } = require('./middleware/rateLimiter');
 // Distributed Traces Routes
 const traceRoutes = require('./routes/traces.routes');
 
+// Contact Routes
+const contactRoutes = require('./routes/contact.routes');
+
 const app = express();
 const PORT = process.env.PORT || 4000;
 
@@ -49,6 +52,9 @@ app.use('/api/roles', rolesRoutes);
 
 // Distributed Traces Routes
 app.use('/api/traces', traceRoutes);
+
+// Contact Routes
+app.use('/api', contactRoutes);
 
 // --- IN-MEMORY DATABASE ---
 let systemStatus = {
