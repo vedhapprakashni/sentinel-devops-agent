@@ -4,9 +4,9 @@ import { TrendingDown, CircleDollarSign } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 interface SavingsCardProps {
-    totalMonthlyEstimate: string;
-    totalPotentialSavings: string;
-    wastePercent: string;
+    totalMonthlyEstimate: string | number;
+    totalPotentialSavings: string | number;
+    wastePercent: string | number;
 }
 
 export function SavingsCard({ totalMonthlyEstimate, totalPotentialSavings, wastePercent }: SavingsCardProps) {
@@ -65,7 +65,7 @@ export function SavingsCard({ totalMonthlyEstimate, totalPotentialSavings, waste
                     />
                 </div>
                 <p className="text-[10px] text-muted-foreground mt-2 text-center uppercase tracking-wider font-semibold">
-                    {parseFloat(wastePercent) > 30 ? 'High Opportunity' : 'Moderate Opportunity'}
+                    {parseFloat(String(wastePercent)) > 30 ? 'High Opportunity' : 'Moderate Opportunity'}
                 </p>
             </motion.div>
         </div>
