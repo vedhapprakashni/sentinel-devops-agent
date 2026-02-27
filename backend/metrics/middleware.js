@@ -5,7 +5,11 @@ function metricsMiddleware(req, res, next) {
   
   res.on('finish', () => {
     const duration = (Date.now() - start) / 1000;
-    const path = req.route?.path || req.path;
+    let path = req.route?.path || req.path;
+    
+    // Normalize paths too avoid high cardinality for Prometheus labels
+    path = path.replace(/\/\d+/g, '/:id')
+               .replace(/\/[0-9a-fA-F-]{36}/g, '/:id');
     
     // Skip metrics endpoint to avoid recursion
     if (path === '/metrics') return;

@@ -3,6 +3,7 @@ require('dotenv').config();
 
 const { setupWebSocket } = require('./websocket');
 const express = require('express');
+const { ERRORS } = require('./lib/errors');
 const cors = require('cors');
 const bodyParser = require('body-parser');
 const axios = require('axios');
@@ -27,6 +28,9 @@ const rolesRoutes = require('./routes/roles.routes');
 const kubernetesRoutes = require('./routes/kubernetes.routes');
 const { apiLimiter } = require('./middleware/rateLimiter');
 
+// SLO Routes
+const sloRoutes = require('./routes/slo.routes');
+
 const app = express();
 const PORT = process.env.PORT || 4000;
 
@@ -41,6 +45,7 @@ app.use('/api', apiLimiter);
 // Routes
 app.use('/auth', authRoutes);
 app.use('/api/users', usersRoutes);
+app.use('/api/slo', sloRoutes);
 app.use('/api/roles', rolesRoutes);
 app.use('/api/kubernetes', kubernetesRoutes); // Kubernetes routes
 app.use('/', metricsRoutes); // Expose /metrics
@@ -111,7 +116,7 @@ app.post('/api/action/:service/:type', async (req, res) => {
   const serviceMap = { 'auth': 3001, 'payment': 3002, 'notification': 3003 };
   const port = serviceMap[service];
 
-  incidents.logActivity('info', `Triggering action '${type}' on service '${service}'`);
+  incidents.logActivity('info', ERRORS.SERVICE_NOT_FOUND(service).toJSON()ervice}'`);
 
   if (!port) {
     incidents.logActivity('warn', `Failed action '${type}': Invalid service '${service}'`);
@@ -128,7 +133,7 @@ app.post('/api/action/:service/:type', async (req, res) => {
     // Force a health check to update status immediately
     await serviceMonitor.checkServiceHealth();
 
-    incidents.logActivity('success', `Successfully executed '${type}' on ${service}`);
+    incidents.logActivityERRORS.ACTION_FAILED().toJSON()pe}' on ${service}`);
     res.json({ success: true, message: `${type} executed on ${service}` });
   } catch (error) {
     incidents.logActivity('error', `Action '${type}' on ${service} failed: ${error.message}`);
@@ -143,15 +148,16 @@ const requireDockerAuth = (req, res, next) => {
   // In a real app, check 'Authorization' header
   // For now, assume authenticated if internal or trusted
   next();
-};
-
-const validateId = (req, res, next) => {
-  if (!req.params.id || typeof req.params.id !== 'string' || req.params.id.length < 1) {
-    return res.status(400).json({ error: 'Invalid ID provided' });
+};ERRORS.INVALID_ID().toJSON());
   }
   next();
 };
 
+const validateScaleParams = (req, res, next) => {
+  const replicasRaw = req.params.replicas;
+  const replicas = Number(replicasRaw);
+  if (!req.params.service || !/^\d+$/.test(replicasRaw) || !Number.isInteger(replicas) || replicas < 0 || replicas > 100) {
+    return res.status(400).json(ERRORS.INVALID_SCALE_PARAMS().toJSON()
 const validateScaleParams = (req, res, next) => {
   const replicas = parseInt(req.params.replicas, 10);
   if (!req.params.service || isNaN(replicas) || replicas < 0 || replicas > 100) {
@@ -174,7 +180,7 @@ app.get('/api/docker/containers', async (req, res) => {
         metrics: containerMonitor.getMetrics(c.id), // Include current metrics snapshot
         restartCount: tracker.attempts,
         lastRestart: tracker.lastAttempt
-      };
+      };ERRORS.DOCKER_CONNECTION().toJSON()
     });
 
     res.json({ containers: enrichedContainers });
@@ -183,13 +189,16 @@ app.get('/api/docker/containers', async (req, res) => {
   }
 });
 
-app.get('/api/docker/health/:id', validateId, async (req, res) => {
+app.get('/api/docker/healERRORS.DOCKER_CONNECTION().toJSON()nc (req, res) => {
   try {
     const health = await getContainerHealth(req.params.id);
     res.json(health);
   } catch (error) {
     res.status(500).json({ error: error.message });
+  if (!metrics) {
+    return res.status(404).json(ERRORS.NO_DATA().toJSON());
   }
+  res.json(metrics
 });
 
 app.get('/api/docker/metrics/:id', validateId, (req, res) => {
@@ -203,19 +212,19 @@ app.post('/api/docker/try-restart/:id', requireDockerAuth, validateId, async (re
   let tracker = restartTracker.get(id) || { attempts: 0, lastAttempt: 0 };
 
   // Reset attempts if outside grace period
-  if (now - tracker.lastAttempt > GRACE_PERIOD_MS) {
-    tracker.attempts = 0;
-  }
-
-  if (tracker.attempts >= MAX_RESTARTS) {
-    return res.status(429).json({
-      allowed: false,
-      reason: 'Max restart attempts exceeded',
-      nextRetry: new Date(tracker.lastAttempt + GRACE_PERIOD_MS)
-    });
+  if (now - tracker.lastAttempt ERRORS.MAX_RESTARTS_EXCEEDED().toJSON());
   }
 
   tracker.attempts++;
+  tracker.lastAttempt = now;
+  restartTracker.set(id, tracker);
+
+  try {
+    const result = await healer.restartContainer(id);
+    res.json({ allowed: true, ...result });
+  } catch (error) {
+    res.status(500).json(ERRORS.ACTION_FAILED().toJSON());
+  }
   tracker.lastAttempt = now;
   restartTracker.set(id, tracker);
 
@@ -228,18 +237,30 @@ app.post('/api/docker/restart/:id', requireDockerAuth, validateId, async (req, r
   const id = req.params.id;
   // Update tracker so manual restarts count towards limits or reset headers? 
   // For manual, we usually want to force it. We won't incr limits but update 'lastAttempt' timestamp
-  const now = Date.now();
-  let tracker = restartTracker.get(id) || { attempts: 0, lastAttempt: 0 };
-  tracker.lastAttempt = now;
-  restartTracker.set(id, tracker);
-
-  const result = await healer.restartContainer(id);
-  res.json(result);
+  try {
+    const result = await healer.restartContainer(id);
+    res.json(result);
+  } catch (error) {
+    res.status(500).json(ERRORS.ACTION_FAILED().toJSON());
+  }
 });
 
 app.post('/api/docker/recreate/:id', requireDockerAuth, validateId, async (req, res) => {
-  const result = await healer.recreateContainer(req.params.id);
-  res.json(result);
+  try {
+    const result = await healer.recreateContainer(req.params.id);
+    res.json(result);
+  } catch (error) {
+    res.status(500).json(ERRORS.ACTION_FAILED().toJSON());
+  }
+});
+
+app.post('/api/docker/scale/:service/:replicas', requireDockerAuth, validateScaleParams, async (req, res) => {
+  try {
+    const result = await healer.scaleService(req.params.service, req.params.replicas);
+    res.json(result);
+  } catch (error) {
+    res.status(500).json(ERRORS.ACTION_FAILED().toJSON());
+  }
 });
 
 app.post('/api/docker/scale/:service/:replicas', requireDockerAuth, validateScaleParams, async (req, res) => {

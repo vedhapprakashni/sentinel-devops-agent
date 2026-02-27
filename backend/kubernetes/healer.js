@@ -14,7 +14,12 @@ async function deletePod(namespace, podName) {
 
 async function scaleDeployment(namespace, deploymentName, replicas) {
   if (!client.initialized) await client.init();
-  const patch = [{ op: 'replace', path: '/spec/replicas', value: parseInt(replicas) }];
+  const count = parseInt(replicas);
+  if (isNaN(count) || count < 0) {
+      throw new Error(`Invalid replica count: ${replicas}`);
+  }
+
+  const patch = [{ op: 'replace', path: '/spec/replicas', value: count }];
   try {
       await client.appsApi.patchNamespacedDeploymentScale(
         deploymentName,
