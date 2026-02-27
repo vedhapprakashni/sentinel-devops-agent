@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { ServiceGrid } from "@/components/dashboard/ServiceGrid";
+import { Header as Navbar } from "@/components/layout/Header";
 import { MetricsCharts } from "@/components/dashboard/MetricsCharts";
 import { AgentReasoningPanel } from "@/components/dashboard/AgentReasoningPanel";
 import { Service, Incident } from "@/lib/mockData";
@@ -211,7 +212,9 @@ export default function DemoPage() {
     const currentStep = steps[currentStepIndex];
 
     return (
-        <div className="container mx-auto p-6 max-w-[1600px] pb-24">
+        <>
+            <Navbar />
+            <div className="container mx-auto p-6 pt-24 max-w-[1600px] pb-24">
             {/* Header & Controls */}
             <div className="flex flex-col md:flex-row items-center justify-between gap-6 mb-8 sticky top-20 z-30 bg-[#0a0a0a]/90 backdrop-blur-md py-4 border-b border-white/5">
                 <div>
@@ -345,6 +348,7 @@ export default function DemoPage() {
                     </div>
                 </div>
             </div>
-        </div>
+            </div>
+        </>
     );
 }
