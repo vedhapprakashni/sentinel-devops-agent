@@ -173,7 +173,7 @@ router.get('/:id/burndown', validateParams(sloIdParamSchema), validateQuery(burn
         const windowStart = Date.now() - windowMinutes * 60 * 1000;
         const incidents = tracker.getIncidents(slo.serviceId).filter(i => i.resolvedAt >= windowStart);
 
-        const points = req.query.points || 30;
+        const points = req.query.points;
         const burndown = generateBurndownData(slo, incidents, points);
 
         res.json({ burndown });
