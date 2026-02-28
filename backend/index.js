@@ -81,6 +81,17 @@ app.use('/api', apiLimiter);
 // Security Routes
 const securityRoutes = require('./routes/security.routes');
 app.use('/api/security', requireAuth, securityRoutes);
+app.use(bodyParser.json({
+  verify: (req, res, buf) => {
+    req.rawBody = buf.toString('utf8');
+  }
+}));
+app.use(express.urlencoded({ 
+  extended: true,
+  verify: (req, res, buf) => {
+    req.rawBody = buf.toString('utf8');
+  }
+})); // Handle Slack URL-encoded payloads
 
 // RBAC Routes
 app.use('/auth', authRoutes);
@@ -256,12 +267,12 @@ app.post('/api/kestra-webhook', (req, res) => {
         type: 'ai_insight',
         severity: 'Medium'
     });
-    const insight = incidents.addAiLog(aiReport);
+    const newInsight = incidents.addAiLog(aiReport);
 
     incidents.logActivity('info', 'Received new AI Analysis report');
     
     if (globalWsBroadcaster) {
-        globalWsBroadcaster.broadcast('INCIDENT_NEW', insight);
+        globalWsBroadcaster.broadcast('INCIDENT_NEW', newInsight);
     }
   }
   systemStatus.lastUpdated = new Date();
@@ -323,7 +334,41 @@ app.post('/api/action/:service/:type', async (req, res) => {
 });
 
 // --- CHATOPS ENDPOINTS ---
-app.post('/api/chatops/slack/actions', (req, res) => {
+const crypto = require('crypto');
+
+// Slack request signature verification middleware
+function verifySlackSignature(req, res, next) {
+    const slackSignature = req.headers['x-slack-signature'];
+    const slackTimestamp = req.headers['x-slack-request-timestamp'];
+
+    if (!slackSignature || !slackTimestamp) {
+        return res.status(401).send('Verification failed - Missing headers');
+    }
+
+    // Protect against replay attacks (5 min)
+    const time = Math.floor(Date.now() / 1000);
+    if (Math.abs(time - slackTimestamp) > 300) {
+        return res.status(401).send('Verification failed - Timestamp too old');
+    }
+
+    const sigBasestring = 'v0:' + slackTimestamp + ':' + req.rawBody;
+    const slackSigningSecret = process.env.SLACK_SIGNING_SECRET;
+    
+    if (!slackSigningSecret) {
+        console.warn('SLACK_SIGNING_SECRET is not set. Verification bypassed.');
+        return next();
+    }
+
+    const mySignature = 'v0=' + crypto.createHmac('sha256', slackSigningSecret).update(sigBasestring, 'utf8').digest('hex');
+
+    if (crypto.timingSafeEqual(Buffer.from(mySignature, 'utf8'), Buffer.from(slackSignature, 'utf8'))) {
+        next();
+    } else {
+        return res.status(401).send('Verification failed - Signature mismatch');
+    }
+}
+
+app.post('/api/chatops/slack/actions', verifySlackSignature, (req, res) => {
     try {
         if (req.body && req.body.payload) {
             const payload = JSON.parse(req.body.payload);
@@ -366,31 +411,35 @@ const requireDockerAuth = (req, res, next) => {
   next();
 };
 
-app.get('/api/settings/notifications', (req, res) => {
+app.get('/api/settings/notifications', requireDockerAuth, (req, res) => {
+    const settings = require('./config/notifications').getSettings();
+    const mask = (url) => url ? url.substring(0, 15) + '...' : '';
     res.json({
-        slackWebhook: process.env.SLACK_WEBHOOK_URL || '',
-        discordWebhook: process.env.DISCORD_WEBHOOK_URL || '',
-        teamsWebhook: process.env.TEAMS_WEBHOOK_URL || '',
-        notifyOnNewIncident: process.env.NOTIFY_ON_INCIDENT !== 'false',
-        notifyOnHealing: process.env.NOTIFY_ON_HEALING !== 'false'
+        slackWebhook: mask(settings.slackWebhook),
+        discordWebhook: mask(settings.discordWebhook),
+        teamsWebhook: mask(settings.teamsWebhook),
+        notifyOnNewIncident: settings.notifyOnNewIncident,
+        notifyOnHealing: settings.notifyOnHealing
     });
 });
 
-app.post('/api/settings/notifications', (req, res) => {
+app.post('/api/settings/notifications', requireDockerAuth, (req, res) => {
     const { slackWebhook, discordWebhook, teamsWebhook, notifyOnNewIncident, notifyOnHealing } = req.body;
     
-    // Dynamically update process environment variables for ChatOps Router overrides
-    if (slackWebhook !== undefined) process.env.SLACK_WEBHOOK_URL = slackWebhook;
-    if (discordWebhook !== undefined) process.env.DISCORD_WEBHOOK_URL = discordWebhook;
-    if (teamsWebhook !== undefined) process.env.TEAMS_WEBHOOK_URL = teamsWebhook;
-    if (notifyOnNewIncident !== undefined) process.env.NOTIFY_ON_INCIDENT = notifyOnNewIncident.toString();
-    if (notifyOnHealing !== undefined) process.env.NOTIFY_ON_HEALING = notifyOnHealing.toString();
+    const updates = {};
+    if (slackWebhook !== undefined && !slackWebhook.includes('...')) updates.slackWebhook = slackWebhook;
+    if (discordWebhook !== undefined && !discordWebhook.includes('...')) updates.discordWebhook = discordWebhook;
+    if (teamsWebhook !== undefined && !teamsWebhook.includes('...')) updates.teamsWebhook = teamsWebhook;
+    if (notifyOnNewIncident !== undefined) updates.notifyOnNewIncident = notifyOnNewIncident === true || notifyOnNewIncident === 'true';
+    if (notifyOnHealing !== undefined) updates.notifyOnHealing = notifyOnHealing === true || notifyOnHealing === 'true';
+    
+    require('./config/notifications').updateSettings(updates);
     
     logActivity('info', 'Notification settings updated via Dashboard.');
     res.json({ success: true, message: 'Settings saved successfully' });
 });
 
-app.post('/api/settings/notifications/test', async (req, res) => {
+app.post('/api/settings/notifications/test', requireDockerAuth, async (req, res) => {
     const { platform, webhookUrl } = req.body;
     const testIncident = {
         id: `MOCK-${Date.now()}`,
@@ -401,22 +450,22 @@ app.post('/api/settings/notifications/test', async (req, res) => {
         type: 'sentinel.test'
     };
 
+    const currentSettings = require('./config/notifications').getSettings();
+    const tempConfig = { ...currentSettings };
+
+    if (webhookUrl && !webhookUrl.includes('...')) {
+        if (platform === 'slack') tempConfig.slackWebhook = webhookUrl;
+        if (platform === 'discord') tempConfig.discordWebhook = webhookUrl;
+        if (platform === 'teams') tempConfig.teamsWebhook = webhookUrl;
+    }
+
     try {
         if (platform === 'slack') {
-            const original = process.env.SLACK_WEBHOOK_URL;
-            process.env.SLACK_WEBHOOK_URL = webhookUrl || original;
-            await require('./integrations/slack').sendIncidentAlert(testIncident);
-            process.env.SLACK_WEBHOOK_URL = original;
+            await require('./integrations/slack').sendIncidentAlert(testIncident, tempConfig);
         } else if (platform === 'discord') {
-            const original = process.env.DISCORD_WEBHOOK_URL;
-            process.env.DISCORD_WEBHOOK_URL = webhookUrl || original;
-            await require('./integrations/discord').sendIncidentAlert(testIncident);
-            process.env.DISCORD_WEBHOOK_URL = original;
+            await require('./integrations/discord').sendIncidentAlert(testIncident, tempConfig);
         } else if (platform === 'teams') {
-            const original = process.env.TEAMS_WEBHOOK_URL;
-            process.env.TEAMS_WEBHOOK_URL = webhookUrl || original;
-            await require('./integrations/teams').sendIncidentAlert(testIncident);
-            process.env.TEAMS_WEBHOOK_URL = original;
+            await require('./integrations/teams').sendIncidentAlert(testIncident, tempConfig);
         } else {
             return res.status(400).json({ error: 'Unknown platform' });
         }

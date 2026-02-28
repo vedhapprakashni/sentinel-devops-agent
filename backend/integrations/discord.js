@@ -4,8 +4,8 @@ const { Webhook, MessageBuilder } = require('discord-webhook-node');
  * Send an incident alert to Discord
  * @param {Object} incidentData - Details of the incident
  */
-const sendIncidentAlert = async (incidentData) => {
-    const webhookUrl = process.env.DISCORD_WEBHOOK_URL;
+const sendIncidentAlert = async (incidentData, config = {}) => {
+    const webhookUrl = config.discordWebhook || process.env.DISCORD_WEBHOOK_URL;
     if (!webhookUrl) {
         console.warn("Discord Integration: Missing DISCORD_WEBHOOK_URL.");
         return;
@@ -37,7 +37,8 @@ const sendIncidentAlert = async (incidentData) => {
         await hook.send(embed);
         console.log(`Discord alert sent for incident ${id}`);
     } catch (error) {
-        console.error('Error sending Discord alert:', error);
+        console.error('Error sending Discord alert:', error.message);
+        throw error;
     }
 };
 

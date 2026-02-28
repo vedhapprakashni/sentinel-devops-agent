@@ -4,8 +4,8 @@ const axios = require('axios');
  * Send an incident alert to Microsoft Teams
  * @param {Object} incidentData - Details of the incident
  */
-const sendIncidentAlert = async (incidentData) => {
-    const webhookUrl = process.env.TEAMS_WEBHOOK_URL;
+const sendIncidentAlert = async (incidentData, config = {}) => {
+    const webhookUrl = config.teamsWebhook || process.env.TEAMS_WEBHOOK_URL;
     if (!webhookUrl) {
         console.warn("Teams Integration: Missing TEAMS_WEBHOOK_URL.");
         return;
@@ -48,20 +48,9 @@ const sendIncidentAlert = async (incidentData) => {
                     ],
                     "actions": status === 'incident.detected' ? [
                         {
-                            "type": "Action.Submit",
-                            "title": "Approve Recovery",
-                            "data": {
-                                "action": "approve",
-                                "incidentId": id
-                            }
-                        },
-                        {
-                            "type": "Action.Submit",
-                            "title": "Decline Recovery",
-                            "data": {
-                                "action": "decline",
-                                "incidentId": id
-                            }
+                            "type": "Action.OpenUrl",
+                            "title": "Review Incident",
+                            "url": "http://localhost:3000/dashboard/incidents"
                         }
                     ] : []
                 }
@@ -70,10 +59,11 @@ const sendIncidentAlert = async (incidentData) => {
     };
 
     try {
-        await axios.post(webhookUrl, card);
+        await axios.post(webhookUrl, card, { timeout: 30000 });
         console.log(`Teams alert sent for incident ${id}`);
     } catch (error) {
-        console.error('Error sending Teams alert:', error);
+        console.error('Error sending Teams alert:', error.message);
+        throw error;
     }
 };
 

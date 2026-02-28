@@ -1,20 +1,20 @@
 const { WebClient } = require('@slack/web-api');
+const axios = require('axios');
 
 /**
  * Send an incident alert to Slack
  * @param {Object} incidentData - Details of the incident
  */
-const sendIncidentAlert = async (incidentData) => {
-    // Determine token: using SLACK_WEBHOOK_URL alias or SLACK_BOT_TOKEN
-    const token = process.env.SLACK_BOT_TOKEN || process.env.SLACK_WEBHOOK_URL; 
-    const channelId = process.env.SLACK_CHANNEL_ID;
+const sendIncidentAlert = async (incidentData, config = {}) => {
+    // Determine token: using passed config or fallback
+    const token = config.slackWebhook || process.env.SLACK_BOT_TOKEN || process.env.SLACK_WEBHOOK_URL; 
+    const channelId = config.slackChannelId || process.env.SLACK_CHANNEL_ID;
 
-    if (!token || !channelId) {
-        console.warn("Slack Integration: Missing SLACK_BOT_TOKEN (or SLACK_WEBHOOK_URL) or SLACK_CHANNEL_ID.");
+    if (!token) {
+        console.warn("Slack Integration: Missing Slack webhook URL or Bot Token.");
         return;
     }
 
-    const client = new WebClient(token);
     const { type, id, title, description, status, severity } = incidentData;
     
     const blocks = [
@@ -85,14 +85,30 @@ const sendIncidentAlert = async (incidentData) => {
     }
 
     try {
-        await client.chat.postMessage({
-            channel: channelId,
-            text: `Incident Update: ${status} - ${title}`,
-            blocks: blocks
-        });
-        console.log(`Slack alert sent for incident ${id}`);
+        if (token.startsWith('http')) {
+            // Webhook mode
+            await axios.post(token, {
+                text: `Incident Update: ${status} - ${title}`,
+                blocks: blocks
+            });
+            console.log(`Slack webhook alert sent for incident ${id}`);
+        } else {
+            // Web API mode
+            if (!channelId) {
+                console.warn("Slack Integration: Missing SLACK_CHANNEL_ID for Web API mode.");
+                return;
+            }
+            const client = new WebClient(token);
+            await client.chat.postMessage({
+                channel: channelId,
+                text: `Incident Update: ${status} - ${title}`,
+                blocks: blocks
+            });
+            console.log(`Slack Web API alert sent for incident ${id}`);
+        }
     } catch (error) {
-        console.error('Error sending Slack alert:', error);
+        console.error('Error sending Slack alert:', error.response?.data || error.message);
+        throw error;
     }
 };
 

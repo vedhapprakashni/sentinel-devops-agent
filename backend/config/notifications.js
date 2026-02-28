@@ -2,19 +2,37 @@ const slack = require('../integrations/slack');
 const discord = require('../integrations/discord');
 const teams = require('../integrations/teams');
 
+let settings = {
+    slackWebhook: process.env.SLACK_WEBHOOK_URL,
+    discordWebhook: process.env.DISCORD_WEBHOOK_URL,
+    teamsWebhook: process.env.TEAMS_WEBHOOK_URL,
+    notifyOnNewIncident: process.env.NOTIFY_ON_INCIDENT !== 'false',
+    notifyOnHealing: process.env.NOTIFY_ON_HEALING !== 'false'
+};
+
+const updateSettings = (newSettings) => {
+    settings = { ...settings, ...newSettings };
+};
+
+const getSettings = () => settings;
+
 /**
  * Send alerts to all configured platforms concurrently
  * @param {Object} payload 
  */
 const notifyAllPlatforms = async (payload) => {
     const notifications = [
-        slack.sendIncidentAlert(payload),
-        discord.sendIncidentAlert(payload),
-        teams.sendIncidentAlert(payload)
+        slack.sendIncidentAlert(payload, settings).catch(e => { console.error('Slack delivery failed:', e.message); throw e; }),
+        discord.sendIncidentAlert(payload, settings).catch(e => { console.error('Discord delivery failed:', e.message); throw e; }),
+        teams.sendIncidentAlert(payload, settings).catch(e => { console.error('Teams delivery failed:', e.message); throw e; })
     ];
 
-    // Wait for all to finish, whether they succeed or fail
-    await Promise.allSettled(notifications);
+    try {
+        await Promise.all(notifications);
+    } catch (error) {
+        // Proper error handling avoiding swallowing the failures
+        console.error('Failed to deliver one or more ChatOps notifications', error);
+    }
 };
 
 /**
@@ -22,7 +40,7 @@ const notifyAllPlatforms = async (payload) => {
  * @param {Object} incidentData 
  */
 const handleIncidentDetected = async (incidentData) => {
-    if (process.env.NOTIFY_ON_INCIDENT === 'false') {
+    if (settings.notifyOnNewIncident === false) {
         console.log('Skipping incident.detected notification due to user preference.');
         return;
     }
@@ -44,7 +62,7 @@ const handleHealingStarted = async (incidentData) => {
  * @param {Object} incidentData 
  */
 const handleHealingCompleted = async (incidentData) => {
-    if (process.env.NOTIFY_ON_HEALING === 'false') {
+    if (settings.notifyOnHealing === false) {
         console.log('Skipping healing.completed notification due to user preference.');
         return;
     }
@@ -77,5 +95,7 @@ module.exports = {
     handleIncidentDetected,
     handleHealingStarted,
     handleHealingCompleted,
-    routeEvent
+    routeEvent,
+    getSettings,
+    updateSettings
 };

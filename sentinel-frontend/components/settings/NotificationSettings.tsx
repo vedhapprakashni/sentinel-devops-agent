@@ -33,7 +33,8 @@ export function NotificationSettings() {
         const fetchSettings = async () => {
             setIsLoading(true);
             try {
-                const res = await fetch('http://localhost:4000/api/settings/notifications');
+                const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+                const res = await fetch(`${apiUrl}/api/settings/notifications`);
                 if (res.ok) {
                     const data = await res.json();
                     setSlackWebhook(data.slackWebhook || '');
@@ -54,7 +55,8 @@ export function NotificationSettings() {
     const handleSave = async () => {
         setIsSaving(true);
         try {
-            const res = await fetch('http://localhost:4000/api/settings/notifications', {
+            const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+            const res = await fetch(`${apiUrl}/api/settings/notifications`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -82,7 +84,8 @@ export function NotificationSettings() {
 
         setTestStatus(prev => ({ ...prev, [platform]: 'Testing...' }));
         try {
-            const res = await fetch('http://localhost:4000/api/settings/notifications/test', {
+            const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+            const res = await fetch(`${apiUrl}/api/settings/notifications/test`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ platform, webhookUrl })
