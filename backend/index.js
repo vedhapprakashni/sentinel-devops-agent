@@ -26,13 +26,15 @@ function executeHealing(incident) {
 
 function initiateHealingProtocol(incident) {
     const incidentId = String(incident.id);
+    const timeoutMs = process.env.AUTO_HEAL_TIMEOUT_MS ? parseInt(process.env.AUTO_HEAL_TIMEOUT_MS, 10) : 5 * 60 * 1000;
     const timeout = setTimeout(() => {
-        if (pendingApprovals.has(incidentId)) {
+        const approval = pendingApprovals.get(incidentId);
+        if (approval) {
             pendingApprovals.delete(incidentId);
             logActivity('warn', `Timeout reached for ${incidentId}, auto-proceeding with healing.`);
             executeHealing(incident);
         }
-    }, 5 * 60 * 1000); // 5 minutes auto-proceed timeout
+    }, timeoutMs); // Configurable auto-proceed timeout
 
     pendingApprovals.set(incidentId, {
         incident,
@@ -71,8 +73,6 @@ const PORT = process.env.PORT || 4000;
 
 // Middleware
 app.use(cors());
-app.use(bodyParser.json());
-app.use(express.urlencoded({ extended: true })); // Handle Slack URL-encoded payloads
 app.use(metricsMiddleware); // Metrics middleware
 
 // Rate limiters
@@ -342,13 +342,13 @@ function verifySlackSignature(req, res, next) {
     const slackTimestamp = req.headers['x-slack-request-timestamp'];
 
     if (!slackSignature || !slackTimestamp) {
-        return res.status(401).send('Verification failed - Missing headers');
+        return res.status(401).json({ error: 'Verification failed - Missing headers' });
     }
 
     // Protect against replay attacks (5 min)
     const time = Math.floor(Date.now() / 1000);
     if (Math.abs(time - slackTimestamp) > 300) {
-        return res.status(401).send('Verification failed - Timestamp too old');
+        return res.status(401).json({ error: 'Verification failed - Timestamp too old' });
     }
 
     const sigBasestring = 'v0:' + slackTimestamp + ':' + req.rawBody;
@@ -364,7 +364,7 @@ function verifySlackSignature(req, res, next) {
     if (crypto.timingSafeEqual(Buffer.from(mySignature, 'utf8'), Buffer.from(slackSignature, 'utf8'))) {
         next();
     } else {
-        return res.status(401).send('Verification failed - Signature mismatch');
+        return res.status(401).json({ error: 'Verification failed - Signature mismatch' });
     }
 }
 
@@ -379,10 +379,10 @@ app.post('/api/chatops/slack/actions', verifySlackSignature, (req, res) => {
                     const actionType = parts[0];
                     const incidentId = parts.slice(1).join('_');
 
-                    if (pendingApprovals.has(incidentId)) {
-                        const approval = pendingApprovals.get(incidentId);
-                        clearTimeout(approval.timeout); // Clear the auto-proceed 5-min timeout
+                    const approval = pendingApprovals.get(incidentId);
+                    if (approval) {
                         pendingApprovals.delete(incidentId);
+                        clearTimeout(approval.timeout); // Clear the auto-proceed timeout
 
                         if (actionType === 'approve') {
                             executeHealing(approval.incident);
@@ -398,7 +398,7 @@ app.post('/api/chatops/slack/actions', verifySlackSignature, (req, res) => {
         res.status(200).send();
     } catch (e) {
         console.error(`ChatOps Action Error: ${e.message}`);
-        res.status(500).send({ error: e.message });
+        res.status(500).json({ error: e.message });
     }
 });
 
@@ -413,11 +413,11 @@ const requireDockerAuth = (req, res, next) => {
 
 app.get('/api/settings/notifications', requireDockerAuth, (req, res) => {
     const settings = require('./config/notifications').getSettings();
-    const mask = (url) => url ? url.substring(0, 15) + '...' : '';
+    const isConfigured = (url) => !!url;
     res.json({
-        slackWebhook: mask(settings.slackWebhook),
-        discordWebhook: mask(settings.discordWebhook),
-        teamsWebhook: mask(settings.teamsWebhook),
+        slackWebhook: isConfigured(settings.slackWebhook),
+        discordWebhook: isConfigured(settings.discordWebhook),
+        teamsWebhook: isConfigured(settings.teamsWebhook),
         notifyOnNewIncident: settings.notifyOnNewIncident,
         notifyOnHealing: settings.notifyOnHealing
     });
@@ -427,9 +427,9 @@ app.post('/api/settings/notifications', requireDockerAuth, (req, res) => {
     const { slackWebhook, discordWebhook, teamsWebhook, notifyOnNewIncident, notifyOnHealing } = req.body;
     
     const updates = {};
-    if (slackWebhook !== undefined && !slackWebhook.includes('...')) updates.slackWebhook = slackWebhook;
-    if (discordWebhook !== undefined && !discordWebhook.includes('...')) updates.discordWebhook = discordWebhook;
-    if (teamsWebhook !== undefined && !teamsWebhook.includes('...')) updates.teamsWebhook = teamsWebhook;
+    if (slackWebhook !== undefined && typeof slackWebhook === 'string' && !slackWebhook.includes('...')) updates.slackWebhook = slackWebhook;
+    if (discordWebhook !== undefined && typeof discordWebhook === 'string' && !discordWebhook.includes('...')) updates.discordWebhook = discordWebhook;
+    if (teamsWebhook !== undefined && typeof teamsWebhook === 'string' && !teamsWebhook.includes('...')) updates.teamsWebhook = teamsWebhook;
     if (notifyOnNewIncident !== undefined) updates.notifyOnNewIncident = notifyOnNewIncident === true || notifyOnNewIncident === 'true';
     if (notifyOnHealing !== undefined) updates.notifyOnHealing = notifyOnHealing === true || notifyOnHealing === 'true';
     
@@ -453,7 +453,7 @@ app.post('/api/settings/notifications/test', requireDockerAuth, async (req, res)
     const currentSettings = require('./config/notifications').getSettings();
     const tempConfig = { ...currentSettings };
 
-    if (webhookUrl && !webhookUrl.includes('...')) {
+    if (typeof webhookUrl === 'string' && webhookUrl !== 'true' && !webhookUrl.includes('...')) {
         if (platform === 'slack') tempConfig.slackWebhook = webhookUrl;
         if (platform === 'discord') tempConfig.discordWebhook = webhookUrl;
         if (platform === 'teams') tempConfig.teamsWebhook = webhookUrl;
