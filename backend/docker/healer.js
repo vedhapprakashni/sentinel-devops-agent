@@ -1,8 +1,42 @@
 const { docker } = require('./client');
+const { scanImage } = require('../security/scanner');
+const { checkCompliance } = require('../security/policies');
+const { logActivity } = require('../services/incidents');
+
+async function performSecurityPrecheck(containerId) {
+    try {
+        const container = docker.getContainer(containerId);
+        const info = await container.inspect();
+        const imageId = info.Image;
+        const scanResult = await scanImage(imageId);
+        const policyCheck = checkCompliance(scanResult);
+
+        if (!policyCheck.compliant) {
+            const errorMsg = `Policy Violation: ${policyCheck.reason || 'Security check failed'}. Blocked action.`;
+            if (logActivity) logActivity('warn', errorMsg);
+            return { blocked: true, error: errorMsg };
+        }
+        return { blocked: false };
+    } catch (e) {
+        console.error(`Security precheck failed for ${containerId}:`, e.message);
+        // Fail open or closed? Usually fail closed for security.
+        return { blocked: true, error: `Security check error: ${e.message}` };
+    }
+}
 
 async function restartContainer(containerId) {
     try {
         const container = docker.getContainer(containerId);
+        
+        // --- Security Check ---
+        const securityCheck = await performSecurityPrecheck(containerId);
+        if (securityCheck.blocked) {
+             const errorMsg = securityCheck.error;
+             console.error(errorMsg);
+             return { action: 'restart', success: false, containerId, error: errorMsg, blocked: true };
+        }
+        // ----------------------
+
         await container.restart({ t: 10 });
         return { action: 'restart', success: true, containerId };
     } catch (error) {
@@ -14,8 +48,20 @@ async function restartContainer(containerId) {
 async function recreateContainer(containerId) {
     try {
         const container = docker.getContainer(containerId);
-        const info = await container.inspect();
+        // Note: inspect is done inside performSecurityPrecheck, but recreate needs info later?
+        // Ah, duplicate inspect is better than polluting logic.
+        // Or reuse info? For now, keep it simple.
+        
+        // --- Security Check ---
+        const securityCheck = await performSecurityPrecheck(containerId);
+        if (securityCheck.blocked) {
+             const errorMsg = securityCheck.error;
+             console.error(errorMsg);
+             return { action: 'recreate', success: false, containerId, error: errorMsg, blocked: true };
+        }
+        // ----------------------
 
+        const info = await container.inspect();
         // Prepare new configuration
         // Use proper mapping for NetworkingConfig from validated inspection
         const networkingConfig = {

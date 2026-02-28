@@ -27,6 +27,7 @@ interface UseIncidentHistoryProps {
 
 interface UseIncidentHistoryResult {
     incidents: Incident[];
+    allFilteredIncidents: Incident[];
     isLoading: boolean;
     totalCount: number;
     totalActive: number;
@@ -276,6 +277,7 @@ export function useIncidentHistory({
 
     return {
         incidents: paginatedIncidents,
+        allFilteredIncidents: sortedIncidents,
         isLoading,
         totalCount: sortedIncidents.length,
         totalActive,
