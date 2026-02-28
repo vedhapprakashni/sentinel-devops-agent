@@ -157,6 +157,8 @@ export default function GettingStartedPage() {
         cli: false,
     });
 
+    const [loaded, setLoaded] = useState(false);
+
     useEffect(() => {
         if (typeof window === "undefined") return;
         try {
@@ -168,15 +170,16 @@ export default function GettingStartedPage() {
         } catch {
             // ignore
         }
+        setLoaded(true);
     }, []);
 
     useEffect(() => {
-        if (typeof window === "undefined") return;
+        if (typeof window === "undefined" || !loaded) return;
         window.localStorage.setItem(
             "sentinel-getting-started",
             JSON.stringify(progress)
         );
-    }, [progress]);
+    }, [progress, loaded]);
 
     const toggle = (key: ProgressKey) =>
         setProgress((p) => ({ ...p, [key]: !p[key] }));
