@@ -52,6 +52,9 @@ function logActivity(type, message) {
   activityLog.unshift(entry);
   if (activityLog.length > 100) activityLog.pop(); // Keep last 100
   console.log(`[LOG] ${type}: ${message}`);
+
+  // Broadcast the new log entry to all connected WebSocket clients
+  wsBroadcaster.broadcast('ACTIVITY_LOG', entry);
 }
 
 // WebSocket Broadcaster
@@ -265,6 +268,9 @@ app.get('/api/docker/containers', async (req, res) => {
       };
     });
 
+    // Broadcast container updates to all WebSocket clients
+    wsBroadcaster.broadcast('CONTAINER_UPDATE', { containers: enrichedContainers });
+
     res.json({ containers: enrichedContainers });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -322,6 +328,19 @@ app.post('/api/docker/restart/:id', requireDockerAuth, validateId, async (req, r
   restartTracker.set(id, tracker);
 
   const result = await healer.restartContainer(id);
+
+  // Broadcast updated containers after restart
+  try {
+    const containers = await listContainers();
+    const enriched = containers.map(c => ({
+      ...c,
+      metrics: monitor.getMetrics(c.id),
+      restartCount: (restartTracker.get(c.id) || { attempts: 0 }).attempts,
+      lastRestart: (restartTracker.get(c.id) || { lastAttempt: 0 }).lastAttempt
+    }));
+    wsBroadcaster.broadcast('CONTAINER_UPDATE', { containers: enriched });
+  } catch (_) { /* best-effort broadcast */ }
+
   res.json(result);
 });
 
