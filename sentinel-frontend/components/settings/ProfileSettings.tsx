@@ -39,7 +39,7 @@ export function ProfileSettings() {
             </div>
 
             <div className="pt-4 border-t border-white/10 flex justify-end">
-                <Button>Save Changes</Button>
+                <Button id="save-settings-btn" shortcutHint="S">Save Changes</Button>
             </div>
         </div>
     );
