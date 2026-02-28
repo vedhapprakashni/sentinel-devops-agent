@@ -76,9 +76,20 @@ const burndownQuerySchema = z.object({
     .describe('Number of data points (1-100)'),
 });
 
+/**
+ * SLO ID path parameter validation
+ */
+const sloIdParamSchema = z.object({
+  id: z
+    .string()
+    .min(1, 'SLO ID is required')
+    .describe('SLO definition identifier'),
+});
+
 module.exports = {
   createSLOSchema,
   updateSLOSchema,
   recordDowntimeSchema,
   burndownQuerySchema,
+  sloIdParamSchema,
 };

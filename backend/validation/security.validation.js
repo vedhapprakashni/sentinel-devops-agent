@@ -48,7 +48,7 @@ const policySchema = z.object({
  */
 const scanAllSchema = z.object({
   force: z
-    .string()
+    .enum(['true', 'false'])
     .transform((val) => val === 'true')
     .optional()
     .describe('Force rescan even if cached'),

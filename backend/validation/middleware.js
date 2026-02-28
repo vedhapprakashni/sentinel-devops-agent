@@ -15,13 +15,18 @@ function validateBody(schema) {
       req.body = validated;
       next();
     } catch (error) {
-      return res.status(400).json({
-        error: 'Validation failed',
-        details: error.errors.map((err) => ({
-          field: err.path.join('.'),
-          message: err.message,
-        })),
-      });
+      // Guard: Only handle Zod validation errors
+      if (error.errors && Array.isArray(error.errors)) {
+        return res.status(400).json({
+          error: 'Validation failed',
+          details: error.errors.map((err) => ({
+            field: err.path.join('.'),
+            message: err.message,
+          })),
+        });
+      }
+      // Delegate non-validation errors to error handler
+      next(error);
     }
   };
 }
@@ -38,13 +43,18 @@ function validateQuery(schema) {
       req.query = validated;
       next();
     } catch (error) {
-      return res.status(400).json({
-        error: 'Invalid query parameters',
-        details: error.errors.map((err) => ({
-          field: err.path.join('.'),
-          message: err.message,
-        })),
-      });
+      // Guard: Only handle Zod validation errors
+      if (error.errors && Array.isArray(error.errors)) {
+        return res.status(400).json({
+          error: 'Invalid query parameters',
+          details: error.errors.map((err) => ({
+            field: err.path.join('.'),
+            message: err.message,
+          })),
+        });
+      }
+      // Delegate non-validation errors to error handler
+      next(error);
     }
   };
 }
@@ -61,13 +71,18 @@ function validateParams(schema) {
       req.params = validated;
       next();
     } catch (error) {
-      return res.status(400).json({
-        error: 'Invalid URL parameters',
-        details: error.errors.map((err) => ({
-          field: err.path.join('.'),
-          message: err.message,
-        })),
-      });
+      // Guard: Only handle Zod validation errors
+      if (error.errors && Array.isArray(error.errors)) {
+        return res.status(400).json({
+          error: 'Invalid URL parameters',
+          details: error.errors.map((err) => ({
+            field: err.path.join('.'),
+            message: err.message,
+          })),
+        });
+      }
+      // Delegate non-validation errors to error handler
+      next(error);
     }
   };
 }

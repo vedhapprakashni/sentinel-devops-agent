@@ -49,7 +49,7 @@ router.post('/policies', requirePermissions('security:write'), validateBody(poli
 
 // Endpoint to trigger scan on all active containers and clear cache if forced
 router.post('/scan-all', validateQuery(scanAllSchema), async (req, res) => {
-    const force = req.query.force === 'true';
+    const force = req.query.force === true;
     if (force) {
         clearCache();
     }
