@@ -16,12 +16,14 @@ export interface Container {
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
 
 export function useContainers(options: { manual?: boolean } = {}) {
+    const { manual } = options;
     const [containers, setContainers] = useState<Container[]>([]);
-    const [loading, setLoading] = useState(true);
+    const [loading, setLoading] = useState(!manual);
     const [error, setError] = useState<string | null>(null);
     const { lastMessage } = useWebSocketContext();
 
     const fetchContainers = useCallback(async () => {
+        setLoading(true);
         try {
             const response = await axios.get(`${API_BASE}/api/docker/containers`);
             setContainers(response.data.containers);
@@ -48,10 +50,12 @@ export function useContainers(options: { manual?: boolean } = {}) {
         }
     };
 
-    // Initial data load only — no polling interval
+    // Auto-fetch on mount only when not in manual mode
     useEffect(() => {
-        fetchContainers();
-    }, [fetchContainers]);
+        if (!manual) {
+            fetchContainers();
+        }
+    }, [manual, fetchContainers]);
 
     // React to WebSocket CONTAINER_UPDATE messages for real-time updates
     useEffect(() => {
