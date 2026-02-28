@@ -8,7 +8,12 @@
     "db:setup": "node db/migrate.js",
     "create-admin": "node create-admin.js",
     "test-rbac": "node test-rbac.js",
-    "quick-setup": "node quick-setup.js"
+    "quick-setup": "node quick-setup.js",
+    "test": "jest --passWithNoTests",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage",
+    "test:unit": "jest --testPathPattern='__tests__' --testNamePattern='Unit'",
+    "test:integration": "jest --testPathPattern='__tests__' --testNamePattern='Integration'"
   },
   "license": "ISC",
   "type": "commonjs",
@@ -26,5 +31,10 @@
     "pg": "^8.11.3",
     "uuid": "^9.0.1",
     "ws": "^8.19.0"
+  },
+  "devDependencies": {
+    "jest": "^29.7.0",
+    "supertest": "^6.3.3",
+    "jest-mock-extended": "^3.0.5"
   }
 }
