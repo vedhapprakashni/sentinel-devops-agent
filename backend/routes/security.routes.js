@@ -3,12 +3,18 @@ const router = express.Router();
 const { scanImage, startScanner, clearCache } = require('../security/scanner');
 const { getPolicy, updatePolicy, checkCompliance } = require('../security/policies');
 const containerMonitor = require('../docker/monitor');
+const { requirePermissions } = require('../auth/middleware');
+const { validateBody, validateQuery } = require('../validation/middleware');
+const {
+  imageScanSchema,
+  policySchema,
+  scanAllSchema,
+} = require('../validation/security.validation');
 
 // Use query param ?imageId=... since image names can contain /
-router.get('/scan', async (req, res) => {
+router.get('/scan', validateQuery(imageScanSchema), async (req, res) => {
     try {
         const imageId = req.query.imageId;
-        if (!imageId) return res.status(400).json({ error: 'imageId query parameter required' });
         const result = await scanImage(imageId);
         res.json(result);
     } catch (error) {
@@ -16,10 +22,9 @@ router.get('/scan', async (req, res) => {
     }
 });
 
-router.get('/compliance', async (req, res) => {
+router.get('/compliance', validateQuery(imageScanSchema), async (req, res) => {
     try {
         const imageId = req.query.imageId;
-        if (!imageId) return res.status(400).json({ error: 'imageId query parameter required' });
         const result = await scanImage(imageId);
         const check = checkCompliance(result);
         res.json({ ...check, scannedAt: result.scannedAt });
@@ -28,13 +33,11 @@ router.get('/compliance', async (req, res) => {
     }
 });
 
-const { requirePermissions } = require('../auth/middleware');
-
 router.get('/policies', (req, res) => {
     res.json(getPolicy());
 });
 
-router.post('/policies', requirePermissions('security:write'), (req, res) => {
+router.post('/policies', requirePermissions('security:write'), validateBody(policySchema), (req, res) => {
     try {
         const newPolicy = req.body;
         updatePolicy(newPolicy);
@@ -45,7 +48,7 @@ router.post('/policies', requirePermissions('security:write'), (req, res) => {
 });
 
 // Endpoint to trigger scan on all active containers and clear cache if forced
-router.post('/scan-all', async (req, res) => {
+router.post('/scan-all', validateQuery(scanAllSchema), async (req, res) => {
     const force = req.query.force === 'true';
     if (force) {
         clearCache();

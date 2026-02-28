@@ -11,6 +11,13 @@ const sloModel = require('../models/slo-definition');
 const tracker = require('../slo/tracker');
 const { calculateErrorBudget, generateBurndownData, MINUTES_PER_WINDOW } = require('../slo/calculator');
 const { requireAuth, requirePermissions } = require('../auth/middleware');
+const { validateBody, validateQuery } = require('../validation/middleware');
+const {
+  createSLOSchema,
+  updateSLOSchema,
+  recordDowntimeSchema,
+  burndownQuerySchema,
+} = require('../validation/slo.validation');
 
 /**
  * GET /api/slo
@@ -70,8 +77,9 @@ router.get('/:id', (req, res) => {
  * POST /api/slo
  * Create a new SLO definition.
  * Requires authentication and slo:write permission.
+ * Validates: serviceId, serviceName, targetAvailability, trackingWindow
  */
-router.post('/', requireAuth, requirePermissions('slo:write'), (req, res) => {
+router.post('/', requireAuth, requirePermissions('slo:write'), validateBody(createSLOSchema), (req, res) => {
     try {
         const slo = sloModel.create(req.body);
         res.status(201).json(slo);
@@ -84,8 +92,9 @@ router.post('/', requireAuth, requirePermissions('slo:write'), (req, res) => {
  * PUT /api/slo/:id
  * Update an existing SLO definition.
  * Requires authentication and slo:write permission.
+ * Validates: targetAvailability, trackingWindow, serviceName
  */
-router.put('/:id', requireAuth, requirePermissions('slo:write'), (req, res) => {
+router.put('/:id', requireAuth, requirePermissions('slo:write'), validateBody(updateSLOSchema), (req, res) => {
     try {
         const slo = sloModel.update(req.params.id, req.body);
         if (!slo) {
@@ -124,8 +133,9 @@ router.delete('/:id', requireAuth, requirePermissions('slo:delete'), (req, res) 
  * POST /api/slo/:id/downtime
  * Record a downtime event for the service associated with this SLO.
  * Requires authentication and slo:write permission.
+ * Validates: downtimeMinutes (positive number), description (optional string)
  */
-router.post('/:id/downtime', requireAuth, requirePermissions('slo:write'), (req, res) => {
+router.post('/:id/downtime', requireAuth, requirePermissions('slo:write'), validateBody(recordDowntimeSchema), (req, res) => {
     try {
         const slo = sloModel.getById(req.params.id);
         if (!slo) {
@@ -133,9 +143,6 @@ router.post('/:id/downtime', requireAuth, requirePermissions('slo:write'), (req,
         }
 
         const { downtimeMinutes, description } = req.body;
-        if (!downtimeMinutes || typeof downtimeMinutes !== 'number' || downtimeMinutes <= 0) {
-            return res.status(400).json({ error: 'downtimeMinutes must be a positive number' });
-        }
 
         const event = tracker.recordDowntime(slo.serviceId, downtimeMinutes, description || '');
 
@@ -152,8 +159,9 @@ router.post('/:id/downtime', requireAuth, requirePermissions('slo:write'), (req,
 /**
  * GET /api/slo/:id/burndown
  * Get burndown chart data for an SLO.
+ * Optional: points query parameter (1-100, default 30)
  */
-router.get('/:id/burndown', (req, res) => {
+router.get('/:id/burndown', validateQuery(burndownQuerySchema), (req, res) => {
     try {
         const slo = sloModel.getById(req.params.id);
         if (!slo) {
@@ -164,8 +172,7 @@ router.get('/:id/burndown', (req, res) => {
         const windowStart = Date.now() - windowMinutes * 60 * 1000;
         const incidents = tracker.getIncidents(slo.serviceId).filter(i => i.resolvedAt >= windowStart);
 
-        let points = parseInt(req.query.points, 10) || 30;
-        points = Math.max(1, Math.min(points, 100));
+        const points = req.query.points || 30;
         const burndown = generateBurndownData(slo, incidents, points);
 
         res.json({ burndown });
