@@ -1,10 +1,12 @@
 const { docker } = require('./client');
+const store = require('../db/metrics-store');
 const { scanImage } = require('../security/scanner');
 
 class ContainerMonitor {
     constructor() {
         this.metrics = new Map();
         this.watchers = new Map();
+        this.lastStorePush = new Map();
         this.securityTimers = new Map();
     }
 
@@ -17,7 +19,7 @@ class ContainerMonitor {
             const imageId = data.Image;
 
             const stream = await container.stats({ stream: true });
-            
+
             this.watchers.set(containerId, stream);
 
             // Schedule periodic scans after successful stream setup
@@ -26,7 +28,18 @@ class ContainerMonitor {
             stream.on('data', (chunk) => {
                 try {
                     const stats = JSON.parse(chunk.toString());
-                    this.metrics.set(containerId, this.parseStats(stats));
+                    const parsed = this.parseStats(stats);
+                    this.metrics.set(containerId, parsed);
+
+                    const now = Date.now();
+                    const lastPush = this.lastStorePush.get(containerId) || 0;
+                    if (now - lastPush >= 60_000) {
+                        store.push(containerId, {
+                            cpuPercent: parseFloat(parsed.cpu),
+                            memPercent: parseFloat(parsed.memory.percent)
+                        });
+                        this.lastStorePush.set(containerId, now);
+                    }
                 } catch (e) {
                     // Ignore parse errors from partial chunks
                 }
@@ -40,7 +53,7 @@ class ContainerMonitor {
             stream.on('end', () => {
                 this.stopMonitoring(containerId);
             });
-            
+
             // watchers.set was moved up
         } catch (error) {
             console.error(`Failed to start monitoring ${containerId}:`, error);
@@ -49,12 +62,12 @@ class ContainerMonitor {
     }
 
     stopMonitoring(containerId) {
-        if (this.watchers.has(containerId)) {
-            const stream = this.watchers.get(containerId);
-            if (stream.destroy) stream.destroy();
-            this.watchers.delete(containerId);
-            this.metrics.delete(containerId);
-        }
+        const stream = this.watchers.get(containerId);
+        if (stream && stream.destroy) stream.destroy();
+        this.watchers.delete(containerId);
+        this.metrics.delete(containerId);
+        this.lastStorePush.delete(containerId);
+        store.clear(containerId);
         if (this.securityTimers.has(containerId)) {
             clearInterval(this.securityTimers.get(containerId));
             this.securityTimers.delete(containerId);
@@ -70,7 +83,7 @@ class ContainerMonitor {
         const timer = setInterval(() => {
             scanImage(imageId).catch(err => console.error(`[Security] Periodic scan failed for ${containerId}:`, err.message));
         }, interval);
-        
+
         this.securityTimers.set(containerId, timer);
     }
 
