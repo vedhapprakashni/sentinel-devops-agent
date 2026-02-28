@@ -34,7 +34,7 @@ export function ProfileDropdown({ isOpen, onClose }: ProfileDropdownProps) {
                         {/* User Info */}
                         <div className="p-4 border-b border-white/10">
                             <div className="flex items-center gap-3">
-                                <div className="h-10 w-10 rounded-full bg-gradient-to-tr from-primary to-purple-500 flex items-center justify-center">
+                                <div className="h-10 w-10 rounded-full bg-linear-to-tr from-primary to-purple-500 flex items-center justify-center">
                                     <User className="h-5 w-5 text-white" />
                                 </div>
                                 <div>

@@ -11,7 +11,7 @@ export function ProfileSettings() {
             </div>
 
             <div className="flex items-center gap-6">
-                <div className="h-20 w-20 rounded-full bg-gradient-to-br from-purple-500 to-cyan-500 flex items-center justify-center text-2xl font-bold text-white shadow-lg shadow-purple-500/20">
+                <div className="h-20 w-20 rounded-full bg-linear-to-br from-purple-500 to-cyan-500 flex items-center justify-center text-2xl font-bold text-white shadow-lg shadow-purple-500/20">
                     JD
                 </div>
                 <div>
