@@ -10,7 +10,7 @@ const express = require('express');
 const bodyParser = require('body-parser');
 
 // Mock Kubernetes client
-jest.mock('../kubernetes/client', () => ({
+jest.mock('../../kubernetes/client', () => ({
   initialized: true,
 
   init: jest.fn(async () => {
@@ -75,7 +75,7 @@ jest.mock('../kubernetes/client', () => ({
 }));
 
 // Mock Kubernetes healer
-jest.mock('../kubernetes/healer', () => ({
+jest.mock('../../kubernetes/healer', () => ({
   scaleDeployment: jest.fn(async (name, namespace, replicas) => {
     return { name, namespace, replicas, status: 'scaled' };
   }),
@@ -90,7 +90,7 @@ jest.mock('../kubernetes/healer', () => ({
 }));
 
 // Mock Kubernetes watcher
-jest.mock('../kubernetes/watcher', () => ({
+jest.mock('../../kubernetes/watcher', () => ({
   watchPods: jest.fn((namespace, callback) => {
     callback({ type: 'ADDED', object: { metadata: { name: 'watched-pod', namespace } } });
     return { stop: jest.fn() };
@@ -98,14 +98,14 @@ jest.mock('../kubernetes/watcher', () => ({
 }));
 
 // Mock incident service
-jest.mock('../services/incidents', () => ({
+jest.mock('../../services/incidents', () => ({
   logActivity: jest.fn((type, message) => {
     return { type, message, timestamp: new Date().toISOString() };
   }),
 }));
 
 // Load the router after mocks are in place
-const kubernetesRoutes = require('../routes/kubernetes.routes');
+const kubernetesRoutes = require('../../routes/kubernetes.routes');
 
 function setupApp() {
   const app = express();

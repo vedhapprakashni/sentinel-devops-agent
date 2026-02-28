@@ -10,7 +10,7 @@ const express = require('express');
 const bodyParser = require('body-parser');
 
 // Mock dependencies
-jest.mock('../slo/calculator', () => ({
+jest.mock('../../slo/calculator', () => ({
   calculateErrorBudget: jest.fn((slo, incidents) => {
     return {
       allowedDowntimeMinutes: 43.2,
@@ -41,7 +41,7 @@ jest.mock('../slo/calculator', () => ({
   },
 }));
 
-jest.mock('../models/slo-definition', () => {
+jest.mock('../../models/slo-definition', () => {
   let mockSlos = new Map();
   const { v4: uuidv4 } = require('uuid');
 
@@ -71,7 +71,7 @@ jest.mock('../models/slo-definition', () => {
   };
 });
 
-jest.mock('../slo/tracker', () => ({
+jest.mock('../../slo/tracker', () => ({
   getIncidents: jest.fn((serviceId) => {
     return [
       {
@@ -104,7 +104,7 @@ jest.mock('../slo/tracker', () => ({
 }));
 
 // Mock auth middleware
-jest.mock('../auth/middleware', () => ({
+jest.mock('../../auth/middleware', () => ({
   requireAuth: (req, res, next) => {
     const token = req.headers.authorization?.substring(7);
     if (!token) {
@@ -135,7 +135,7 @@ jest.mock('../auth/middleware', () => ({
 }));
 
 // Load the router after mocks are in place
-const sloRoutes = require('../routes/slo.routes');
+const sloRoutes = require('../../routes/slo.routes');
 
 function setupApp() {
   const app = express();

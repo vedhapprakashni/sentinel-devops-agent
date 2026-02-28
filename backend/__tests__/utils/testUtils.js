@@ -35,46 +35,40 @@ function createTestApp(setupRoutes) {
 }
 
 /**
- * Mock the auth middleware functions
- * @returns {Object} Mocked middleware functions
+ * Export auth mock implementations for use in test files
+ * Note: Test files should apply jest.mock() calls at module top-level for hoisting
  */
-function mockAuthMiddleware() {
-  const { MockAuthService, generateTestToken } = require('../mocks/auth.mock');
+const mockAuthMiddlewareImpl = {
+  requireAuth: (req, res, next) => {
+    const token = req.headers.authorization?.substring(7);
+    if (!token) {
+      return res.status(401).json({ error: 'Missing or invalid authorization header' });
+    }
+    req.user = {
+      userId: 'test-user',
+      email: 'test@example.com',
+      permissions: ['read', 'write'],
+    };
+    next();
+  },
 
-  jest.mock('../auth/middleware', () => ({
-    requireAuth: (req, res, next) => {
-      const token = req.headers.authorization?.substring(7);
-      if (!token) {
-        return res.status(401).json({ error: 'Missing or invalid authorization header' });
+  requirePermissions: (...permissions) => {
+    return (req, res, next) => {
+      if (!req.user) {
+        return res.status(401).json({ error: 'Authentication required' });
       }
-      try {
-        req.user = MockAuthService.validateAccessToken(token);
-        next();
-      } catch (error) {
-        res.status(401).json({ error: error.message });
+
+      const userPermissions = req.user.permissions || [];
+      const hasAll = permissions.every((perm) => userPermissions.includes(perm));
+
+      if (!hasAll) {
+        return res.status(403).json({ error: 'Insufficient permissions' });
       }
-    },
 
-    requirePermissions: (...permissions) => {
-      return (req, res, next) => {
-        if (!req.user) {
-          return res.status(401).json({ error: 'Authentication required' });
-        }
-
-        const userPermissions = req.user.permissions || [];
-        const hasAll = permissions.every((perm) => userPermissions.includes(perm));
-
-        if (!hasAll) {
-          return res.status(403).json({ error: 'Insufficient permissions' });
-        }
-
-        next();
-      };
-    },
-  }));
-
-  return { generateTestToken };
-}
+      next();
+    };
+  },
+};
 
 /**
  * Standard test response validators
@@ -147,6 +141,6 @@ const validateResponse = {
 
 module.exports = {
   createTestApp,
-  mockAuthMiddleware,
+  mockAuthMiddlewareImpl,
   validateResponse,
 };

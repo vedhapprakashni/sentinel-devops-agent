@@ -10,7 +10,7 @@ const express = require('express');
 const bodyParser = require('body-parser');
 
 // Mock dependencies
-jest.mock('../security/scanner', () => ({
+jest.mock('../../security/scanner', () => ({
   scanImage: jest.fn(async (imageId) => {
     return {
       imageId,
@@ -35,7 +35,7 @@ jest.mock('../security/scanner', () => ({
   }),
 }));
 
-jest.mock('../security/policies', () => ({
+jest.mock('../../security/policies', () => ({
   getPolicy: jest.fn(() => {
     return {
       allowedSeverities: ['low', 'medium'],
@@ -57,7 +57,7 @@ jest.mock('../security/policies', () => ({
   }),
 }));
 
-jest.mock('../docker/monitor', () => ({
+jest.mock('../../docker/monitor', () => ({
   monitorContainers: jest.fn(async () => {
     return { status: 'monitoring' };
   }),
@@ -68,7 +68,7 @@ jest.mock('../docker/monitor', () => ({
 }));
 
 // Mock auth middleware
-jest.mock('../auth/middleware', () => ({
+jest.mock('../../auth/middleware', () => ({
   requireAuth: (req, res, next) => {
     const token = req.headers.authorization?.substring(7);
     if (!token) {
@@ -100,7 +100,7 @@ jest.mock('../auth/middleware', () => ({
 }));
 
 // Load the router after mocks are in place
-const securityRoutes = require('../routes/security.routes');
+const securityRoutes = require('../../routes/security.routes');
 
 function setupApp() {
   const app = express();

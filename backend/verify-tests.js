@@ -110,6 +110,7 @@ try {
   const devDependencies = [
     'jest',
     'supertest',
+    'jest-mock-extended',
   ];
   
   console.log('Test Scripts:');

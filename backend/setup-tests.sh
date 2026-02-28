@@ -13,7 +13,7 @@ if [ ! -f "package.json" ]; then
 fi
 
 echo "📦 Installing dependencies..."
-npm install
+npm install || { echo "❌ npm install failed"; exit 1; }
 
 echo ""
 echo "✅ Installation complete!"
@@ -32,3 +32,4 @@ npm test
 
 echo ""
 echo "✨ Test run complete!"
+exit $?
