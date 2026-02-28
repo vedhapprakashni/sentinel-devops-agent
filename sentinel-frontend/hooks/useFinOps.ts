@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 
 export interface FinOpsReport {
     totalMonthlyEstimate: string;
@@ -22,10 +22,11 @@ export function useFinOps(preset: string = 'aws') {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
-    const fetchFinOps = async (signal?: AbortSignal) => {
+    const fetchFinOps = useCallback(async (signal?: AbortSignal) => {
         try {
             setLoading(true);
-            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'}/api/finops/summary?preset=${preset}`, { signal });
+            const baseUrl = process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, '') ?? '';
+            const res = await fetch(`${baseUrl}/api/finops/summary?preset=${preset}`, { signal });
             if (!res.ok) throw new Error('Failed to fetch FinOps data');
             const json = await res.json();
             setData(json);
@@ -36,13 +37,13 @@ export function useFinOps(preset: string = 'aws') {
         } finally {
             setLoading(false);
         }
-    };
+    }, [preset]);
 
     useEffect(() => {
         const controller = new AbortController();
         fetchFinOps(controller.signal);
         return () => controller.abort();
-    }, [preset]);
+    }, [fetchFinOps]);
 
     return { data, loading, error, refetch: fetchFinOps };
 }

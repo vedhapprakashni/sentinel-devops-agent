@@ -12,6 +12,7 @@ import {
     ChevronLeft,
     ChevronRight,
     BarChart3,
+    Target,
     Menu,
     X,
     CircleDollarSign,
