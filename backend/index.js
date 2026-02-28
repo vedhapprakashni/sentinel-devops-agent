@@ -10,7 +10,42 @@ const axios = require('axios');
 const { listContainers, getContainerHealth } = require('./docker/client');
 const containerMonitor = require('./docker/monitor');
 const healer = require('./docker/healer');
-const finopsRoutes = require('./routes/finops.routes');
+const { routeEvent } = require('./config/notifications');
+
+const pendingApprovals = new Map();
+
+function executeHealing(incident) {
+    logActivity('info', `Executing healing for incident ${incident.id}`);
+    routeEvent('healing.started', incident);
+
+    setTimeout(() => {
+        logActivity('success', `Healing completed for incident ${incident.id}`);
+        routeEvent('healing.completed', incident);
+    }, 6000); // Simulate healing duration
+}
+
+function initiateHealingProtocol(incident) {
+    const incidentId = String(incident.id);
+    const configuredTimeout = Number(process.env.AUTO_HEAL_TIMEOUT_MS);
+    const timeoutMs = Number.isFinite(configuredTimeout) && configuredTimeout > 0
+      ? configuredTimeout
+      : 5 * 60 * 1000;
+    const timeout = setTimeout(() => {
+        const approval = pendingApprovals.get(incidentId);
+        if (approval) {
+            pendingApprovals.delete(incidentId);
+            logActivity('warn', `Timeout reached for ${incidentId}, auto-proceeding with healing.`);
+            executeHealing(incident);
+        }
+    }, timeoutMs); // Configurable auto-proceed timeout
+
+    pendingApprovals.set(incidentId, {
+        incident,
+        timeout
+    });
+
+    routeEvent('incident.detected', incident);
+}
 
 // New Services
 const serviceMonitor = require('./services/monitor');
@@ -41,8 +76,7 @@ const PORT = process.env.PORT || 4000;
 
 // Middleware
 app.use(cors());
-app.use(bodyParser.json());
-app.use('/api/finops', finopsRoutes);
+app.use(metricsMiddleware); // Metrics middleware
 
 // Rate limiters
 app.use('/api', apiLimiter);
@@ -50,6 +84,17 @@ app.use('/api', apiLimiter);
 // Security Routes
 const securityRoutes = require('./routes/security.routes');
 app.use('/api/security', requireAuth, securityRoutes);
+app.use(bodyParser.json({
+  verify: (req, res, buf) => {
+    req.rawBody = buf.toString('utf8');
+  }
+}));
+app.use(express.urlencoded({ 
+  extended: true,
+  verify: (req, res, buf) => {
+    req.rawBody = buf.toString('utf8');
+  }
+})); // Handle Slack URL-encoded payloads
 
 // RBAC Routes
 app.use('/auth', authRoutes);
@@ -104,6 +149,84 @@ const restartTracker = new Map(); // containerId -> { attempts: number, lastAtte
 const MAX_RESTARTS = 3;
 const GRACE_PERIOD_MS = 60 * 1000; // 1 minute
 
+// Continuous health checking
+let isChecking = false;
+
+async function checkServiceHealth() {
+  if (isChecking) return;
+  isChecking = true;
+
+  try {
+    console.log('🔍 Checking service health...');
+    let hasChanges = false;
+
+    for (const service of services) {
+      let newStatus, newCode;
+      try {
+        const response = await axios.get(service.url, { timeout: 30000 });
+        console.log(`✅ ${service.name}: ${response.status} - ${response.data.status}`);
+        newStatus = 'healthy';
+        newCode = response.status;
+      } catch (error) {
+        const code = error.response?.status || 503;
+        console.log(`❌ ${service.name}: ERROR - ${error.code || error.message}`);
+        newStatus = code >= 500 ? 'critical' : 'degraded';
+        newCode = code;
+      }
+
+      if (
+        systemStatus.services[service.name].status !== newStatus ||
+        systemStatus.services[service.name].code !== newCode
+      ) {
+        const prevStatus = systemStatus.services[service.name].status;
+
+        // Log Status Changes
+        if (newStatus === 'healthy' && prevStatus !== 'healthy' && prevStatus !== 'unknown') {
+          logActivity('success', `Service ${service.name} recovered to HEALTHY`);
+        } else if (newStatus !== 'healthy' && prevStatus !== newStatus) {
+          const severity = newStatus === 'critical' ? 'alert' : 'warn';
+          logActivity(severity, `Service ${service.name} is ${newStatus.toUpperCase()} (Code: ${newCode})`);
+
+          // Trigger ChatOps Incident
+          if (newStatus === 'critical') {
+              initiateHealingProtocol({
+                  id: `INC-${service.name}-${Date.now()}`,
+                  title: `Service Failure: ${service.name}`,
+                  description: `Healthcheck for ${service.name} repeatedly failing with code ${newCode}.`,
+                  type: 'service_crash',
+                  severity: 'High'
+              });
+          }
+        }
+
+        systemStatus.services[service.name] = {
+          status: newStatus,
+          code: newCode,
+          lastUpdated: new Date()
+        };
+        hasChanges = true;
+
+        // Broadcast individual service update
+        wsBroadcaster.broadcast('SERVICE_UPDATE', {
+          name: service.name,
+          ...systemStatus.services[service.name]
+        });
+      }
+    }
+
+    if (hasChanges) {
+      systemStatus.lastUpdated = new Date();
+      // Broadcast full metrics update
+      wsBroadcaster.broadcast('METRICS', systemStatus);
+    }
+  } finally {
+    isChecking = false;
+  }
+}
+
+setInterval(checkServiceHealth, 5000);
+checkServiceHealth();
+
 // --- ENDPOINTS FOR FRONTEND ---
 
 app.get('/api/status', (req, res) => {
@@ -124,12 +247,35 @@ app.post('/api/kestra-webhook', (req, res) => {
   
   if (aiReport) {
     systemStatus.aiAnalysis = aiReport;
-    const insight = incidents.addAiLog(aiReport);
+    // Create an incident/insight object
+    const insight = {
+      id: Date.now(),
+      timestamp: new Date(),
+      analysis: aiReport,
+      summary: aiReport
+    };
+    aiLogs.unshift(insight);
+    if (aiLogs.length > 50) aiLogs.pop();
+
+    logActivity('info', 'Received new AI Analysis report');
+
+    // Broadcast new incident/insight
+    wsBroadcaster.broadcast('INCIDENT_NEW', insight);
+
+    // Call routeEvent with the incident payload for ChatOps
+    initiateHealingProtocol({
+        ...insight,
+        title: 'Application Insight Alert',
+        description: insight.summary,
+        type: 'ai_insight',
+        severity: 'Medium'
+    });
+    const newInsight = incidents.addAiLog(aiReport);
 
     incidents.logActivity('info', 'Received new AI Analysis report');
     
     if (globalWsBroadcaster) {
-        globalWsBroadcaster.broadcast('INCIDENT_NEW', insight);
+        globalWsBroadcaster.broadcast('INCIDENT_NEW', newInsight);
     }
   }
   systemStatus.lastUpdated = new Date();
@@ -190,6 +336,75 @@ app.post('/api/action/:service/:type', async (req, res) => {
   }
 });
 
+// --- CHATOPS ENDPOINTS ---
+const crypto = require('crypto');
+
+// Slack request signature verification middleware
+function verifySlackSignature(req, res, next) {
+    const slackSignature = req.headers['x-slack-signature'];
+    const slackTimestamp = req.headers['x-slack-request-timestamp'];
+
+    if (!slackSignature || !slackTimestamp) {
+        return res.status(401).json({ error: 'Verification failed - Missing headers' });
+    }
+
+    // Protect against replay attacks (5 min)
+    const time = Math.floor(Date.now() / 1000);
+    if (Math.abs(time - slackTimestamp) > 300) {
+        return res.status(401).json({ error: 'Verification failed - Timestamp too old' });
+    }
+
+    const sigBasestring = 'v0:' + slackTimestamp + ':' + req.rawBody;
+    const slackSigningSecret = process.env.SLACK_SIGNING_SECRET;
+    
+    if (!slackSigningSecret) {
+        console.warn('SLACK_SIGNING_SECRET is not set. Verification bypassed.');
+        return next();
+    }
+
+    const mySignature = 'v0=' + crypto.createHmac('sha256', slackSigningSecret).update(sigBasestring, 'utf8').digest('hex');
+
+    if (crypto.timingSafeEqual(Buffer.from(mySignature, 'utf8'), Buffer.from(slackSignature, 'utf8'))) {
+        next();
+    } else {
+        return res.status(401).json({ error: 'Verification failed - Signature mismatch' });
+    }
+}
+
+app.post('/api/chatops/slack/actions', verifySlackSignature, (req, res) => {
+    try {
+        if (req.body && req.body.payload) {
+            const payload = JSON.parse(req.body.payload);
+            if (payload.type === 'block_actions') {
+                const action = payload.actions[0];
+                if (action && action.value) {
+                    const parts = action.value.split('_');
+                    const actionType = parts[0];
+                    const incidentId = parts.slice(1).join('_');
+
+                    const approval = pendingApprovals.get(incidentId);
+                    if (approval) {
+                        pendingApprovals.delete(incidentId);
+                        clearTimeout(approval.timeout); // Clear the auto-proceed timeout
+
+                        if (actionType === 'approve') {
+                            executeHealing(approval.incident);
+                        } else if (actionType === 'decline') {
+                            logActivity('warn', `Healing manually declined for incident ${incidentId}`);
+                        }
+                    } else {
+                        console.warn(`ChatOps: Action taken on expired or non-existent incident ${incidentId}`);
+                    }
+                }
+            }
+        }
+        res.status(200).send();
+    } catch (e) {
+        console.error(`ChatOps Action Error: ${e.message}`);
+        res.status(500).json({ error: e.message });
+    }
+});
+
 // --- DOCKER ENDPOINTS ---
 
 // Middleware for ID/Service validation (mock auth for docker endpoints)
@@ -198,6 +413,70 @@ const requireDockerAuth = (req, res, next) => {
   // For now, assume authenticated if internal or trusted
   next();
 };
+
+app.get('/api/settings/notifications', requireDockerAuth, (req, res) => {
+    const settings = require('./config/notifications').getSettings();
+    const isConfigured = (url) => !!url;
+    res.json({
+        slackWebhook: isConfigured(settings.slackWebhook),
+        discordWebhook: isConfigured(settings.discordWebhook),
+        teamsWebhook: isConfigured(settings.teamsWebhook),
+        notifyOnNewIncident: settings.notifyOnNewIncident,
+        notifyOnHealing: settings.notifyOnHealing
+    });
+});
+
+app.post('/api/settings/notifications', requireDockerAuth, (req, res) => {
+    const { slackWebhook, discordWebhook, teamsWebhook, notifyOnNewIncident, notifyOnHealing } = req.body;
+    
+    const updates = {};
+    if (slackWebhook !== undefined && typeof slackWebhook === 'string' && !slackWebhook.includes('...')) updates.slackWebhook = slackWebhook;
+    if (discordWebhook !== undefined && typeof discordWebhook === 'string' && !discordWebhook.includes('...')) updates.discordWebhook = discordWebhook;
+    if (teamsWebhook !== undefined && typeof teamsWebhook === 'string' && !teamsWebhook.includes('...')) updates.teamsWebhook = teamsWebhook;
+    if (notifyOnNewIncident !== undefined) updates.notifyOnNewIncident = notifyOnNewIncident === true || notifyOnNewIncident === 'true';
+    if (notifyOnHealing !== undefined) updates.notifyOnHealing = notifyOnHealing === true || notifyOnHealing === 'true';
+    
+    require('./config/notifications').updateSettings(updates);
+    
+    logActivity('info', 'Notification settings updated via Dashboard.');
+    res.json({ success: true, message: 'Settings saved successfully' });
+});
+
+app.post('/api/settings/notifications/test', requireDockerAuth, async (req, res) => {
+    const { platform, webhookUrl } = req.body;
+    const testIncident = {
+        id: `MOCK-${Date.now()}`,
+        title: 'Mock Sentinel Test Event',
+        description: 'This is a test notification from Sentinel DevOps Agent to verify webhook configuration.',
+        status: 'incident.detected',
+        severity: 'Info',
+        type: 'sentinel.test'
+    };
+
+    const currentSettings = require('./config/notifications').getSettings();
+    const tempConfig = { ...currentSettings };
+
+    if (typeof webhookUrl === 'string' && webhookUrl !== 'true' && !webhookUrl.includes('...')) {
+        if (platform === 'slack') tempConfig.slackWebhook = webhookUrl;
+        if (platform === 'discord') tempConfig.discordWebhook = webhookUrl;
+        if (platform === 'teams') tempConfig.teamsWebhook = webhookUrl;
+    }
+
+    try {
+        if (platform === 'slack') {
+            await require('./integrations/slack').sendIncidentAlert(testIncident, tempConfig);
+        } else if (platform === 'discord') {
+            await require('./integrations/discord').sendIncidentAlert(testIncident, tempConfig);
+        } else if (platform === 'teams') {
+            await require('./integrations/teams').sendIncidentAlert(testIncident, tempConfig);
+        } else {
+            return res.status(400).json({ error: 'Unknown platform' });
+        }
+        res.json({ success: true, message: 'Test Successful' });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
 
 const validateId = (req, res, next) => {
   if (!req.params.id || typeof req.params.id !== 'string' || req.params.id.length < 1) {
