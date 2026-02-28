@@ -16,6 +16,7 @@ const footerLinks = {
         { label: "Contact Us", href: "/contact" },
         { label: "Privacy Policy", href: "/privacy" },
         { label: "Terms & Conditions", href: "/terms" },
+        { label: "Getting Started", href: "/docs/getting-started" },
     ],
     highlights: [
         { icon: Zap, label: "<500ms Response" },
