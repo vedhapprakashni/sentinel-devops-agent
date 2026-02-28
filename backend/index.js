@@ -26,7 +26,10 @@ function executeHealing(incident) {
 
 function initiateHealingProtocol(incident) {
     const incidentId = String(incident.id);
-    const timeoutMs = process.env.AUTO_HEAL_TIMEOUT_MS ? parseInt(process.env.AUTO_HEAL_TIMEOUT_MS, 10) : 5 * 60 * 1000;
+    const configuredTimeout = Number(process.env.AUTO_HEAL_TIMEOUT_MS);
+    const timeoutMs = Number.isFinite(configuredTimeout) && configuredTimeout > 0
+      ? configuredTimeout
+      : 5 * 60 * 1000;
     const timeout = setTimeout(() => {
         const approval = pendingApprovals.get(incidentId);
         if (approval) {
