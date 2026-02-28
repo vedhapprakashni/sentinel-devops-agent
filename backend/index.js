@@ -1,6 +1,9 @@
 // Load environment variables
 require('dotenv').config();
 
+// Validate configuration before starting
+const { validateConfig } = require('./config/validator');
+validateConfig({ exitOnError: process.env.NODE_ENV === 'production' });
 const { setupWebSocket } = require('./websocket');
 const express = require('express');
 const cors = require('cors');
